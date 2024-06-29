@@ -111,7 +111,7 @@
 
    С другой стороны, я также собрал 10 подписей одногруппников. Для получения информации о подписях сертификата я использовал команду `gpg –list-sigs {email}`.
 
-   ![](images/1.png)
+   <img width="521" alt="1" src="https://github.com/Nifacy/mai-labs/assets/95340036/223ff00d-bdba-4c51-aafa-062f31adcd58">
 
 ## Выводы
 
