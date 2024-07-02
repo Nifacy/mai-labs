@@ -539,3 +539,5 @@ IterativeMethodResult IterativeMethod(const Matrix::TMatrix& alpha, const Matrix
 #### Результат
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
+
+![](images/3.png)
