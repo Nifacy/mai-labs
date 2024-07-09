@@ -541,3 +541,158 @@ IterativeMethodResult IterativeMethod(const Matrix::TMatrix& alpha, const Matrix
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
 ![](images/3.png)
+
+### Метод вращений
+
+Среди численных методов для решения задачи поиска собственных значений матрицы существует метода вращений Якоби. Данный метод имеет ограничения на входящую матрицу в виде симметричности ($A ^ T = A$). Его задачей является решение полной проблемы собственных значений и собственных векторов матриц.
+
+Данный метод основывается на идее итерационном применении преобразований подобия
+
+$$
+\Lambda = U ^ {-1} \cdot A \cdot U
+$$
+
+поскольку для симметрических матриц $A$ матрица преобразования подобия $U$ является ортогональной ($U ^ {-1} = U ^ T$), то $\Lambda = U ^ T \cdot A \cdot U$, где $\Lambda$ - диагональная матрица с собственными значениями на главной диагонали.
+
+Сформулируем алгоритм работы методы вращений Якоби. Пусть дана симметрическая матрица $A$. Требуется вычислить все собственные значения и соответствующие им собственные векторы с заданной точностью $\varepsilon$.
+
+Пусть известна матрица $A^ {(k)}$ на $k$-й итерации, при этом для $k = 0$: $A ^ {(0)} = A$.
+
+1. На начальной итерации (при $k = 0$) имеем $A ^ {(0)} = A$;
+
+2. На каждой итерации выбирается максимальный по модулю недиагональный элемент $a_{ij} ^ {(k)}$ матрицы $A ^ {(k)}$ ($\left| a_{ij} ^ {(k)} \right| = \max_{l < m} \left| a_{lm} ^ {(k)} \right|$);
+
+3. Ставится задача найти такую ортогональную матрицу $U ^ {(k)}$, чтобы в результате преобразования подобия $A ^ {(k + 1)} = U ^ {(k) T} \cdot A ^ {(k)} \cdot U ^ {(k)}$ произошло обнуление элемента $a_{ij} ^ {(k+1)}$ матрицы $A ^ {(k + 1)}$. В качестве ортогональной матрицы выбирается матрица вращения, имеющая следующий вид:
+
+   ![](images/4.png)
+
+   Угол вращения $\varphi ^ {(k)}$ определяется из условия $a_{ij} ^ {(k + 1)} = 0$:
+
+   $$
+   \varphi ^ {(k)} = \frac{1}{2} \cdot \arctg{
+       \frac{
+            2 \cdot a_{ij} ^ {(k)}
+        }{
+            a_{ii} ^ {(k)} - a_{jj} ^ {(k)}
+        }
+   }
+   $$
+
+   причем если $a_{ii} ^ {(k)} = a_{jj} ^ {(k)}$, то $\varphi ^ {(k)} = \frac{\pi}{4}$.
+
+4. Строится матрица $A ^ {(k + 1)}$
+
+   $$
+   A ^ {(k + 1)} = U ^ {(k) T} \cdot A ^ {(k)} \cdot U ^ {(k)}
+   $$
+
+   Так как метод вращений Якоби также является итерационным, то возникает необходимость в определении критерия окончания итерационного процесса. Он имеет следующий вид:
+
+   $$
+   t \left( A ^ {(k + 1)} \right) =
+   \sqrt{\sum_{l, m; l < m} \left( a_{lm} ^ {(k + 1)} \right) ^ 2}
+   $$
+
+   Данное неравенство описывает условие малости суммы квадратов в недиагональных элементах.
+
+#### Входные данные
+
+Ниже приведен пример входных данных для решения задачи поиска собственных значений с использованием метода вращений Якоби, соответствующий моему варианту
+
+$$
+\left( \begin{matrix}
+    -6 &&  6 && -8 \\
+     6 && -4 &&  9 \\
+    -8 &&  9 && -2 \\
+\end{matrix} \right)
+$$
+
+#### Реализация метода вращений Якоби
+
+Ниже предоставлена программная реализация метода вращения Якоби
+
+```cpp
+std::pair<int, int> FindMaxNotDiagonalElement(const Matrix::TMatrix& A) {
+    int n = A.GetSize().first;
+    int maxI = 0, maxJ = 1;
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            if (fabsf(A.Get(i, j)) > fabsf(A.Get(maxI, maxJ))) {
+                maxI = i;
+                maxJ = j;
+            }
+        }
+    }
+    return {maxI, maxJ};
+}
+
+float GetRotationAngle(const Matrix::TMatrix& A, int i, int j) {
+    float aii = A.Get(i, i), ajj = A.Get(j, j), aij = A.Get(i, j);
+    if (aii == ajj) return M_PI / 4.0;
+    return 0.5 * atan((2.0 * aij) / (aii - ajj));
+}
+
+Matrix::TMatrix GetRotationMatrix(int n, int i, int j, float phi) {
+    Matrix::TMatrix U = Matrix::TMatrix::Eye(n);
+    float c = cos(phi), s = sin(phi);
+    U.Set(i, i, c);
+    U.Set(j, j, c);
+    U.Set(i, j, -s);
+    U.Set(j, i, s);
+    return U;
+}
+
+Matrix::TMatrix GetNextA(const Matrix::TMatrix& A, const Matrix::TMatrix& U) {
+    return Matrix::Transpose(U) * A * U;
+}
+
+float t(const Matrix::TMatrix& A) {
+    int n = A.GetSize().first;
+    float s = 0.0, el;
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            el = A.Get(i, j);
+            s += el * el;
+        }
+    }
+    return sqrt(s);
+}
+
+EigenTaskResult SolveEigenTask(const Matrix::TMatrix& M, float eps) {
+    Matrix::TMatrix A(M);
+    int n = A.GetSize().first;
+    Matrix::TMatrix U = Matrix::TMatrix::Eye(n);
+    EigenTaskResult result;
+    result.iterations = 0;
+
+    while (t(A) > eps) {
+        std::pair<int, int> pos = FindMaxNotDiagonalElement(A);
+        float phi = GetRotationAngle(A, pos.first, pos.second);
+        Matrix::TMatrix u = GetRotationMatrix(n, pos.first, pos.second, phi);
+        A = GetNextA(A, u);
+        U = U * u;
+        result.iterations++;
+    }
+
+    for (int i = 0; i < n; ++i) {
+        result.eigenValues.push_back(A.Get(i, i));
+    }
+
+    for (int i = 0; i < n; ++i) {
+        Matrix::TMatrix v(n, 1);
+        for (int j = 0; j < n; ++j) {
+            v.Set(j, 0, U.Get(j, i));
+        }
+        result.eigenVectors.push_back(v);
+    }
+
+    return result;
+}
+```
+
+#### Результат
+
+Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
+
+![](images/5.png)
