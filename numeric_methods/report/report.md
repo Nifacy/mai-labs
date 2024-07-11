@@ -696,3 +696,228 @@ EigenTaskResult SolveEigenTask(const Matrix::TMatrix& M, float eps) {
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
 ![](images/5.png)
+
+### QR-алгоритм нахождения собственных значений матриц
+
+Также, для решения задачи поиска собственных значений и собственных векторов матрицы может быть применен метод QR-разложения. Его суть заключается в представлении исходной матрицы $A$ в виде следующего произведения
+
+$$
+A = Q \cdot R
+$$
+
+где $Q$ - ортогональная матрица, а $R$ - верхняя треугольная. Одним из возможных способов построения $QR$ разложения является использование преобразования Хаусхолдера, который позволяет обратить в нуль группу поддиагональных элементов столбца матрицы.
+
+Преобразование Хаусхолдера осуществляется с использованием матрицы Хаусхолдера, имеющей следующий вид:
+
+$$
+H = E - \frac{2}{\nu ^ T \cdot \nu}\cdot \nu \cdot \nu ^ T
+$$
+
+где $v$ - произвольный ненулевой столбец.
+
+Далее, для решения поставленной задачи, необходимо рассмотреть случай, когда необходимо обратить в нуль все элементы вектора кроме первого. Для этого необходимо построить матрицу Хаусхолдера такую, чтобы она удовлетворяла следующему равенству
+
+$$
+\widetilde{b} = H \cdot b
+$$
+
+где $\widetilde{b} = \left( \widetilde{b_1},\ 0, \ldots, 0 \right) ^ T $ - столбец $b$, в котором все элементы, кроме первого, стали нулевыми.
+
+В этом случае вектор $\nu$ имеет следующий вид:
+
+$$
+\nu = b + sign \left( b_1 \right) \cdot \left| \left| b \right| \right|_2 \cdot e_1
+$$
+
+Применяя описанную процедуру для обнуления поддиагональных элементов каждого столбца исходной матрицы, можно за фиксированное количество шагов выполнить ее QR-разложение.
+
+Процедура QR-разложения многократно применяется в QR-алгоритме для вычисления собственных значений. При этом строится следующий
+итерационный процесс:
+
+$$
+\begin{matrix}
+A ^ {(0)} = A \\
+A ^ {(0)} = Q ^ {(0)} \cdot R^{(0)} \\
+A ^ {(1)} = R ^ {(0)} \cdot Q ^ {(0)} \\
+\ldots \\
+A ^ {(k)} = Q ^ {(k)} \cdot R ^ {(k)} \\
+A ^ {(k + 1)} = R ^ {(k)} \cdot Q ^ {(k)} \\
+\end{matrix}
+$$
+
+Таким образом, каждая итерация выполняется в два этапа. На первом этапе матрица $A ^ {(k)}$ разлагается на произведение ортогональной матрицы $Q ^ {(k)}$ и верхней треугольной матрицы $R ^ {(k)}$. На втором этапе эти матрицы перемножаются в обратном порядке.
+
+Если у матрицы нет кратных собственных значений, последовательность $A ^ {(k)}$ сходится к верхней треугольной матрице (если все собственные значения вещественные) или к верхней квазитреугольной матрице (если имеются комплексно-сопряженные пары собственных значений).
+
+Таким образом, каждому вещественному собственному значению будет соответствовать столбец с поддиагональными элементами, стремящимися к нулю. В качестве критерия сходимости итерационного процесса для таких собственных значений можно использовать следующее неравенство:
+
+$$
+\sqrt{\sum_{l = m + 1} ^ n \left( a_{lm} ^ {(k)} \right)^{2}} \leq \varepsilon
+$$
+
+#### Входные данные
+
+Ниже приведен пример входных данных для решения задачи поиска собственных значений с использованием метода $QR$-разложения,
+соответствующий моему варианту
+
+$$
+\left( \begin{matrix} 
+     9 &&  0 && 2 \\
+    -6 &&  4 && 4 \\
+    -2 && -7 && 5 \\
+\end{matrix} \right)
+$$
+
+#### Реализация
+
+Ниже предоставлена программная реализация алгоритма $QR$-разложения. Она также включает в себя вычисление матрицы Хаусхолдера.
+
+```cpp
+using ComplexPair = std::pair<std::complex<float>, std::complex<float>>;
+
+using EigenValues = std::vector<std::complex<float>>;
+
+using ChangeHistory = std::vector<float>;
+
+const int HISTORY_SIZE = 5;
+
+void GetHouseholderMatrix(const Matrix::TMatrix& A, int i, Matrix::TMatrix& H) {
+    int n = A.GetSize().first;
+    Matrix::TMatrix v(n, 1);
+
+    for (int j = 0; j < n; ++j) {
+        if (j < i) {
+            v.Set(j, 0, 0);
+        }
+
+        else if (j > i) {
+            v.Set(j, 0, A.Get(j, i));
+        }
+
+        else {
+            float aDiag = A.Get(i, i);
+            float signA = float((aDiag > 0) - (aDiag < 0));
+            float sum = 0.0;
+
+            for (int t = j; t < n; ++t) {
+                sum += A.Get(t, i) * A.Get(t, i);
+            }
+
+            v.Set(
+                j, 0,
+                aDiag + signA * sqrt(sum)
+            );
+        }
+    }
+
+    float k = (Matrix::Transpose(v) * v).Get(0, 0);
+    H = v * Matrix::Transpose(v) * (-2.0 / k) + Matrix::TMatrix::Eye(n);
+}
+
+void QRDecompose(const Matrix::TMatrix& A, Matrix::TMatrix& Q, Matrix::TMatrix& R) {
+    int n = A.GetSize().first;
+    Matrix::TMatrix H(n, n);
+    Q = Matrix::TMatrix::Eye(n);
+    R = A;
+
+    for (int i = 0; i < n - 1; ++i) {
+        GetHouseholderMatrix(R, i, H);
+        Q = Q * H;
+        R = H * R;
+    }
+}
+
+ComplexPair FindComplexEigeValues(const Matrix::TMatrix& A, int i) {
+    float a1 = A.Get(i, i), a2 = A.Get(i + 1, i + 1);
+    float a3 = A.Get(i + 1, i), a4 = A.Get(i, i + 1);
+    float b = - a1 - a2;
+    float c = a1 * a2 - a3 * a4;
+    float d = b * b - 4.0 * c;
+
+    std::complex<float> dSqrt = std::sqrt(std::complex<float>(d, 0));
+    std::complex<float> bComplex = std::complex<float>(b, 0.0);
+    std::complex<float> k = 0.5;
+
+    return { k * (-bComplex + dSqrt), k * (-bComplex - dSqrt) };
+}
+
+bool tReal(const Matrix::TMatrix& A, int i, int j, float eps) {
+    int n = A.GetSize().first;
+    float sum = 0.0;
+    for (int t = j; t < n; ++t) {
+        sum += A.Get(t, i) * A.Get(t, i);
+    }
+
+    return std::sqrt(sum) <= eps;
+}
+
+float tComplex(const Matrix::TMatrix& Ai, int i, float eps) {
+    int n = Ai.GetSize().first;
+
+    Matrix::TMatrix Q(n, n), R(n, n);
+    QRDecompose(Ai, Q, R);
+    Matrix::TMatrix ANext = R * Q;
+
+    ComplexPair lambda1 = FindComplexEigeValues(Ai, i);
+    ComplexPair lambda2 = FindComplexEigeValues(ANext, i);
+
+    return (std::abs(lambda2.first - lambda1.first) <= eps) && (std::abs(lambda2.second - lambda1.second) <= eps);
+}
+
+bool IsEigenValueReal(const ChangeHistory& history) {
+    int startIndex = std::max(1, int(history.size()) - HISTORY_SIZE);
+
+    for (int i = startIndex; i < history.size(); ++i) {
+        if (history[i] >= history[i - 1]) {
+            return false;
+        }
+    }
+
+    return true;
+
+}
+
+void UpdateChangeHistory(const Matrix::TMatrix& A, std::vector<ChangeHistory>& history) {
+    int n = A.GetSize().first;
+
+    for (int i = 0; i < n - 1; ++i) {
+        history[i].push_back(std::abs(A.Get(i + 1, i)));
+    }
+}
+
+EigenValues GetEigenValues(const Matrix::TMatrix& A, float eps) {
+    int n = A.GetSize().first;
+
+    Matrix::TMatrix Q(n, n), R(n, n);
+    Matrix::TMatrix Ai = A;
+    EigenValues values;
+
+    std::vector<std::vector<float>> history(n);
+    int i = 0;
+
+    while (i < n) {
+        QRDecompose(Ai, Q, R);
+        Ai = R * Q;
+        UpdateChangeHistory(Ai, history);
+
+        if (tReal(Ai, i, i + 1, eps)) {
+            values.push_back(Ai.Get(i, i));
+            i++;
+        } else if (tComplex(Ai, i, eps) && tReal(Ai, i, i + 2, eps)) {
+            ComplexPair p = FindComplexEigeValues(Ai, i);
+            values.push_back(p.first);
+            values.push_back(p.second);
+            i += 2;
+        }
+    }
+
+    return values;
+}
+```
+
+#### Результат
+
+Ниже предоставлен пример работы программы с входными данными,
+соответствующими моему варианту
+
+![](images/6.png)
