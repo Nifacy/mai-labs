@@ -1058,8 +1058,200 @@ def newton_method(f: Function, a: float, b: float, eps: float, iterations: int) 
     return MethodResult(last_x, i)
 ```
 
-### Результат
+#### Результат
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
 ![](images/7.png)
+
+### Решение систем нелинейных уравнений
+
+Задача решения системы нелинейных уравнений можно описать в виде решения следующей системы
+
+$$
+\left\{ \begin{matrix}
+    f_1 (x_1, x_2, x_3, \ldots, x_n) = 0 \\
+    f_2 (x_1, x_2, x_3, \ldots, x_n) = 0 \\
+    \ldots \\
+    f_n (x_1, x_2, x_3, \ldots, x_n) = 0 \\
+\end{matrix} \left.
+$$
+
+где все функции системы непрерывны и дифференцируемы вблизи решения.
+
+Аналогично с решением одного уравнения, используя метод простых итераций, мы можем записать уравнение в следующий эквивалентный вид
+
+$$
+\left\{ \begin{matrix}
+    x_1 = \varphi_1 (x_1, x_2, x_3, \ldots, x_n) \\
+    x_2 = \varphi_2 (x_1, x_2, x_3, \ldots, x_n) \\
+    \ldots \\
+    x_n = \varphi_n (x_1, x_2, x_3, \ldots, x_n) \\
+\end{matrix} \right.
+$$
+
+Тогда, на основе начального приближения $x ^ {(0)} = \left( x_1^{(0)}, x_2^{(0)}, \ldots, x_n^{(0)} \right)$ можно построить решение системы нелинейных уравнений методом простых итераций по следующей схеме
+
+$$
+\left\{ \begin{matrix}
+    x_1 ^ {(k + 1)} = \varphi_1 \left( x_1^{(k)}, x_2^{(k)}, x_3^{(k)}, \ldots, x_n^{(k)} \right) \\
+    x_2 ^ {(k + 1)} = \varphi_2 \left( x_1^{(k)}, x_2^{(k)}, x_3^{(k)}, \ldots, x_n^{(k)} \right) \\
+    \ldots \\
+    x_n ^ {(k + 1)} = \varphi_n \left( x_1^{(k)}, x_2^{(k)}, x_3^{(k)}, \ldots, x_n^{(k)} \right) \\
+\end{matrix} \right.
+$$
+
+На практике используют следующий критерий окончания итерации для данного метода
+
+$$
+J(x ^ {(k)}) =
+\left[ \frac{\partial \varphi_i (x^{(k)})}{\partial x_j} \right]; \ \
+
+\left| \left| J(x ^ {(k)}) \right| \right| \le q < 1
+$$
+
+Это условие описывает то, что метод простых итераций сходится к решению, если какая-либо норма матрицы Якоби $J(x ^ {(k)})$, построенная по правым частям $\varphi_i$ эквивалентной системы в замкнутой области $G$, меньше единицы на каждой итерации.
+
+Также, часто используют матричную форму этого критерия
+
+$$
+\max_{x \in G} \left| \left| \varphi'(x) \right| \right| =
+\max_{x \in G} \left\{ \max_{i} \sum_{j = 1}^{n} \left| \frac{\partial \varphi_i (X)}{ \partial x_j} \right| \right\}
+$$
+
+Или, если вычисление этого критерия затруднительно:
+
+$$
+\left| x ^ {(k + 1)} - x ^ {(k)} \right| < \varepsilon
+$$
+
+Как и в случае с решением одного уравнения, метод Ньютона отличается от метода простых итераций определением перехода к следующему решению. В метод Ньютона он имеет вид:
+
+$$
+x ^ {(k + 1)} = x ^ {(k)} - J ^ {-1} (x ^ {(k)}) \cdot f(x ^ {(k)})
+$$
+
+где $J(x ^ {(k)})$ - матрица Якоби, имеющая вид:
+
+$$
+J(x^{(k)}) = \left| \begin{matrix}
+    \frac{\partial f_1(x^{(k)})}{\partial x_1} && \frac{\partial f_1(x^{(k)})}{\partial x_2} && \ldots && \frac{\partial f_1(x^{(k)})}{\partial x_n} \\
+    \frac{\partial f_2(x^{(k)})}{\partial x_1} && \frac{\partial f_2(x^{(k)})}{\partial x_2} && \ldots && \frac{\partial f_2(x^{(k)})}{\partial x_n} \\
+    \ldots && \ldots && \ldots && \ldots \\
+    \frac{\partial f_n(x^{(k)})}{\partial x_1} && \frac{\partial f_n(x^{(k)})}{\partial x_2} && \ldots && \frac{\partial f_n(x^{(k)})}{\partial x_n} \\
+\end{matrix} \right|
+$$
+
+В практических вычислениях в качестве условия окончания итераций обычно используют критерий, выполняющийся для всех переменных системы:
+
+$$
+\left| x ^ {(k + 1)} - x ^ {(k)} \right| < \varepsilon
+$$
+
+#### Входные данные
+
+Ниже приведен пример входных данных для решения задачи поиска решения системы нелинейных уравнений с использованием методов Ньютона и метода простых итераций, соответствующий моему варианту
+
+$$
+\left\{ \begin{matrix}
+    x_1^2 + x_2^2 - a^2 = 0, \\
+    x_1 - e^{x_2} + a = 0
+\end{matrix} \right.
+$$
+
+где значение параметра $a = 2$.
+
+#### Реализация метода простых итераций и Ньютона
+
+Ниже предоставлена программная реализация метода простых итераций и Ньютона для решения системы нелинейных уравнений
+
+```python
+class MethodResult(NamedTuple):
+    x: np.ndarray[float]
+    iterations: int
+
+class VectorFunction(np.ndarray):
+    def __new__(cls, input_array) -> "VectorFunction":
+        obj = np.asarray(input_array).view(cls)
+        return obj
+
+    def __call__(self, x: Vector) -> Vector:
+        return np.array([func(x) for func in self])
+
+def _sign(x: float) -> float:
+    if x == 0.0:
+        return 0.0
+    if x < 0.0:
+        return -1.0
+    return 1.0
+
+def _partial_derivative(f: MultiArgFunction, arg_index: int) -> MultiArgFunction:
+    dx = 0.0001
+
+    def _df(x):
+        n = len(x)
+        x2 = x + np.array([dx if i == arg_index else 0.0 for i in range(n)])
+        return (f(x2) - f(x)) / dx
+
+    return _df
+
+def _derivative(f: MultiArgFunction, n: int) -> VectorFunction:
+    return VectorFunction([_partial_derivative(f, i) for i in range(n)])
+
+def _jakobi_matrix(f: VectorFunction) -> VectorFunction:
+    n = len(f)
+    return VectorFunction([_derivative(el, n) for el in f])
+
+def _norm(matrix: Vector) -> float:
+    return abs(matrix).max()
+
+def _build_phi(f: VectorFunction, n: int, index: int, s1: Vector, s2: Vector) -> MultiArgFunction:
+    f_el = f[index]
+    df = _derivative(f_el, n)
+    pdf = _partial_derivative(f_el, index)
+    f_sign = _sign(pdf(s1))
+    mx = max_value(lambda x: _norm(df(x)), s1, s2)
+    return lambda x: x[index] - (f_sign / mx) * f_el(x)
+
+def _solve_system(A: Matrix, b: Vector) -> Vector:
+    l, u, p = task_1.lu_decompose(A)
+    return task_1.solve_system(l, u, p, b)
+
+def iteration_method(f: MultiArgFunction, s1: Vector, s2: Vector, eps: float, iterations: int) -> MethodResult:
+    n = len(f)
+    phi = VectorFunction([_build_phi(f, n, i, s1, s2) for i in range(n)])
+    last_x = (s1 + s2) / 2.0
+    i = 0
+
+    while i <= iterations:
+        x = phi(last_x)
+        if _norm(x - last_x) <= eps:
+            return MethodResult(x, i)
+        last_x = x
+        i += 1
+
+    return MethodResult(last_x, i)
+
+def newton_method(f: MultiArgFunction, s1: Vector, s2: Vector, eps: float, iterations: int) -> MethodResult:
+    J = _jakobi_matrix(f)
+    last_x = (s1 + s2) / 2.0
+    i = 0
+
+    while i <= iterations:
+        dx = _solve_system(J(last_x), -f(last_x))
+        x = last_x + dx
+
+        if _norm(x - last_x) <= eps:
+            return MethodResult(x, i)
+
+        last_x = x
+        i += 1
+
+    return MethodResult(last_x, i)
+```
+
+#### Результат
+
+Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
+
+![](images/8.png)
