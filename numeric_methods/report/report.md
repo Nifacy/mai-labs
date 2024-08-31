@@ -227,7 +227,7 @@ void SolveSystem(
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/1.png)
+![1](https://github.com/user-attachments/assets/c48c479e-a553-4b49-8077-0ad38f1f1a0c)
 
 ### Метод прогонки
 
@@ -350,7 +350,8 @@ void SolveUsingRunCoefficients(const Matrix::TMatrix& runCoefs, Matrix::TMatrix&
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/2.png)
+![2](https://github.com/user-attachments/assets/e5456eba-80b2-4719-b901-84a058531c13)
+
 
 ### Итерационные методы решения СЛАУ
 
@@ -542,7 +543,7 @@ IterativeMethodResult IterativeMethod(const Matrix::TMatrix& alpha, const Matrix
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/3.png)
+![3](https://github.com/user-attachments/assets/32763ad3-896d-4981-9837-42b096bb08cf)
 
 ### Метод вращений
 
@@ -566,7 +567,7 @@ $$
 
 3. Ставится задача найти такую ортогональную матрицу $U ^ {(k)}$, чтобы в результате преобразования подобия $A ^ {(k + 1)} = U ^ {(k) T} \cdot A ^ {(k)} \cdot U ^ {(k)}$ произошло обнуление элемента $a_{ij} ^ {(k+1)}$ матрицы $A ^ {(k + 1)}$. В качестве ортогональной матрицы выбирается матрица вращения, имеющая следующий вид:
 
-   ![](images/4.png)
+   ![4](https://github.com/user-attachments/assets/91321a13-a327-4d32-9428-4fcf2f6f7bd0)
 
    Угол вращения $\varphi ^ {(k)}$ определяется из условия $a_{ij} ^ {(k + 1)} = 0$:
 
@@ -697,7 +698,7 @@ EigenTaskResult SolveEigenTask(const Matrix::TMatrix& M, float eps) {
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/5.png)
+![5](https://github.com/user-attachments/assets/fe17da46-6578-4c3e-bf1f-141eebb32ff8)
 
 ### QR-алгоритм нахождения собственных значений матриц
 
@@ -922,7 +923,7 @@ EigenValues GetEigenValues(const Matrix::TMatrix& A, float eps) {
 Ниже предоставлен пример работы программы с входными данными,
 соответствующими моему варианту
 
-![](images/6.png)
+![6](https://github.com/user-attachments/assets/49e0c1dc-8f01-4836-b3da-1e673fe3ecd9)
 
 ## Лабораторная работа №2
 
@@ -1064,7 +1065,7 @@ def newton_method(f: Function, a: float, b: float, eps: float, iterations: int) 
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/7.png)
+![7](https://github.com/user-attachments/assets/9cc9cd6a-7259-4e87-8821-51dae7d742f3)
 
 ### Решение систем нелинейных уравнений
 
@@ -1256,7 +1257,7 @@ def newton_method(f: MultiArgFunction, s1: Vector, s2: Vector, eps: float, itera
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/8.png)
+![8](https://github.com/user-attachments/assets/bab33bba-ddb1-4efc-ae8e-97a8f27da931)
 
 ## Лабораторная работа №3
 
@@ -1411,7 +1412,7 @@ class NewtonInterpolationPolynomial:
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/9.png)
+![9](https://github.com/user-attachments/assets/83ecb9b2-ba5c-43bf-9c69-03a4e18af9ab)
 
 ### Сплайн-интерполяция
 
@@ -1541,7 +1542,7 @@ class CubicSplineInterploation:
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/10.png)
+![10](https://github.com/user-attachments/assets/5249f12d-f353-4a18-9bd4-72258b34cb6f)
 
 ### Метод наименьших квадратов
 
@@ -1622,7 +1623,7 @@ class MinimalSquareInterpolation:
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/11.png)
+![11](https://github.com/user-attachments/assets/265b8fbb-5385-4bcf-a97a-6eca0ef21eb8)
 
 ### Численное дифференцирование
 
@@ -1740,7 +1741,7 @@ def second_derivative_factor(X: Vector, Y: Vector, x: float) -> float:
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/12.png)
+![12](https://github.com/user-attachments/assets/5ab569d4-435c-4618-bf05-37f04aae3cdd)
 
 ### Численное интегрирование
 
@@ -1843,7 +1844,7 @@ def runge_rombert_method(integral_1: float, h1: float, integral_2: float, h2: fl
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/13.png)
+![13](https://github.com/user-attachments/assets/1fadc881-a7da-4a9a-8d41-039fa1919fbf)
 
 ## Лабораторная работа №2
 
@@ -2048,7 +2049,7 @@ def adams(eq: DiffEquation, y_0: Vector, grid: Grid, underlying_method: OdeSolve
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/14.png)
+![14](https://github.com/user-attachments/assets/d0892deb-9482-41b2-acc3-ea4212c94923)
 
 ### Численные методы решения краевой задачи для ОДУ
 
@@ -2258,4 +2259,4 @@ def finite_diff_method(eq: DiffEquation, cond_1: BoundaryCondition, cond_2: Boun
 
 Ниже предоставлен пример работы программы с входными данными, соответствующими моему варианту
 
-![](images/15.png)
+![15](https://github.com/user-attachments/assets/3c0de61e-5178-4d96-9d4c-cbfbe6d5f71a)
