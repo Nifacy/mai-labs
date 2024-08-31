@@ -1118,7 +1118,7 @@ $$
 
 $$
 \max_{x \in G} \left| \left| \varphi'(x) \right| \right| =
-\max_{x \in G}\left\lbrace \max_{i} \sum_{j = 1}^{n} \left| \frac{\partial \varphi_i (X)}{ \partial x_j} \right| \right\}
+\max_{x \in G}\left\lbrace \max_{i} \sum_{j = 1}^{n} \left| \frac{\partial \varphi_i (X)}{ \partial x_j} \right| \right\rbrace
 $$
 
 Или, если вычисление этого критерия затруднительно:
@@ -1873,7 +1873,7 @@ $$
 Для решения данной задачи с использованием численных методов часто вводят разностную сетку на отрезке $[a, b]$:
 
 $$
-\Omega ^ {(k)} =\left\lbrace x_k = x_0 + h \cdot k \right\}
+\Omega ^ {(k)} =\left\lbrace x_k = x_0 + h \cdot k \right\rbrace
 $$
 
 Здесь, точки $x_i$ - узлы сетки, $h$ - шаг разностной сетки.
