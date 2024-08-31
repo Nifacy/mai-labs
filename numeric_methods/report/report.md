@@ -28,11 +28,13 @@ $$
 Если выразить данный процесс в виде матричных операций, то увидим, что данная запись эквивалентна записи $A ^ {(k)} = M_k \cdot A ^ {(k - 1)}$, где матрица $M$ определяется следующим образом:
 
 $$
-m_{ij} ^ k = \left\{ \begin{matrix}
-    1, && i = j \\
-    0, && i \ne j, j \ne k \\
-    - \mu_{k + 1} ^ {(k)}, && i \ne j, j = k \\
-\end{matrix} \right.
+m_{ij} ^ k =\left\lbrace
+    \begin{matrix}
+        1, && i = j \\
+        0, && i \ne j, j \ne k \\
+        - \mu_{k + 1} ^ {(k)}, && i \ne j, j = k \\
+    \end{matrix}
+\right.
 $$
 
 Рассмотрим теперь, как можно выразить прямой ход метода Гаусса при помощи выше описанных матричных операций:
@@ -253,14 +255,14 @@ $$
 
 $$
 \begin{matrix}
-P_i = \left\{ \begin{matrix}
+P_i =\left\lbrace \begin{matrix}
     - \frac{c_1}{b_1}, && i = 1 \\
     \frac{-c_i}{b_i + a_i \cdot P_{i - 1}}, && \text{иначе} \\ 
 \end{matrix} \right.
 
 &&
 
-Q_i = \left\{ \begin{matrix}
+Q_i =\left\lbrace \begin{matrix}
     \frac{d_1}{b_1}, && i = 1 \\
     \frac{d_i - a_i \cdot Q_{i - 1}}{b_i + a_i \cdot P_{i - 1}}, && \text{иначе} \\
 \end{matrix} \right.
@@ -978,7 +980,7 @@ $$
 Для выбора начального приближения $x ^ {(0)}$ используется теорема, согласно которой в качестве начального приближения нужно выбрать тот конец интервала, где знак функции совпадает со знаком второй производной:
 
 $$
-x ^ {(0)} = \left\{ \begin{matrix}
+x ^ {(0)} =\left\lbrace \begin{matrix}
     a, && \text{если} \ f(a) \cdot f''(a) > 0
     b, && \text{если} \ f(b) \cdot f''(b) > 0
 \end{matrix} \right.
@@ -1116,7 +1118,7 @@ $$
 
 $$
 \max_{x \in G} \left| \left| \varphi'(x) \right| \right| =
-\max_{x \in G} \left\{ \max_{i} \sum_{j = 1}^{n} \left| \frac{\partial \varphi_i (X)}{ \partial x_j} \right| \right\}
+\max_{x \in G}\left\lbrace \max_{i} \sum_{j = 1}^{n} \left| \frac{\partial \varphi_i (X)}{ \partial x_j} \right| \right\}
 $$
 
 Или, если вычисление этого критерия затруднительно:
@@ -1285,7 +1287,7 @@ $$
 где $l_i(x)$ - многочлены степени $n$, которые называются лагранжевыми многочленами влияния. Они удовлетворяют условию:
 
 $$
-l_i(x_j) = \left\{
+l_i(x_j) =\left\lbrace
     \begin{matrix}
         1, && \text{если} \ i = j \\
         0, && \text{иначе} \\
@@ -1871,7 +1873,7 @@ $$
 Для решения данной задачи с использованием численных методов часто вводят разностную сетку на отрезке $[a, b]$:
 
 $$
-\Omega ^ {(k)} = \left\{ x_k = x_0 + h \cdot k \right\}
+\Omega ^ {(k)} =\left\lbrace x_k = x_0 + h \cdot k \right\}
 $$
 
 Здесь, точки $x_i$ - узлы сетки, $h$ - шаг разностной сетки.
