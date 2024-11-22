@@ -16,19 +16,19 @@ typedef struct _TArray {
     uint32_t size;
 } TArray;
 
-#define EXIT_WITH_ERROR(message)                                       \
-    {                                                                  \
-        fprintf(stderr, "ERROR: [line %d] %s\n", __LINE__, (message)); \
-        exit(0);                                                       \
-    }
+#define EXIT_WITH_ERROR(message)                                   \
+{                                                                  \
+    fprintf(stderr, "ERROR: [line %d] %s\n", __LINE__, (message)); \
+    exit(0);                                                       \
+}
 
-#define SAVE_CUDA(call)                                  \
-    {                                                    \
-        cudaError_t result = call;                       \
-        if (result != cudaSuccess) {                     \
-            EXIT_WITH_ERROR(cudaGetErrorString(result)); \
-        }                                                \
-    }
+#define SAVE_CUDA(call)                              \
+{                                                    \
+    cudaError_t result = call;                       \
+    if (result != cudaSuccess) {                     \
+        EXIT_WITH_ERROR(cudaGetErrorString(result)); \
+    }                                                \
+}
 
 void checkRunResult() {
     cudaDeviceSynchronize();
@@ -45,13 +45,13 @@ __global__ void hist(TElement* arr, uint32_t* h, uint32_t n, uint32_t m) {
         atomicAdd(&h[arr[i]], 1);
     }
 
-#ifdef DEBUG_LONG
-    for (uint32_t i = idx; i < m; ++i) {
-        if (h[i] != 0) {
-            printf("hist : h[%u] = %u\n", i, h[i]);
+    #ifdef DEBUG_LONG
+        for (uint32_t i = idx; i < m; ++i) {
+            if (h[i] != 0) {
+                printf("hist : h[%u] = %u\n", i, h[i]);
+            }
         }
-    }
-#endif
+    #endif
 }
 
 /* scan algorithm */
@@ -67,15 +67,15 @@ __global__ void upPhase(uint32_t* h, uint32_t n) {
             indexA = i * m + m - 1;
             indexB = i * m + m / 2 - 1;
 
-#ifdef DEBUG
-            if (indexA >= n) {
-                printf("upPhase : error : indexA = %u >= %u\n", indexA, n);
-            }
+            #ifdef DEBUG
+                if (indexA >= n) {
+                    printf("upPhase : error : indexA = %u >= %u\n", indexA, n);
+                }
 
-            if (indexB >= n) {
-                printf("upPhase : error : indexB = %u >= %u\n", indexB, n);
-            }
-#endif
+                if (indexB >= n) {
+                    printf("upPhase : error : indexB = %u >= %u\n", indexB, n);
+                }
+            #endif
 
             h[indexA] += h[indexB];
         }
@@ -96,11 +96,11 @@ __global__ void downPhase(uint32_t* h, uint32_t n) {
     }
     __syncthreads();
 
-#ifdef DEBUG
-    if (idx == 0) {
-        printf("[log] downPhase : lastElement set\n");
-    }
-#endif
+    #ifdef DEBUG
+        if (idx == 0) {
+            printf("[log] downPhase : lastElement set\n");
+        }
+    #endif
 
     for (uint32_t m = n; m > 1; m >>= 1) {
         d = n / m;
@@ -108,15 +108,15 @@ __global__ void downPhase(uint32_t* h, uint32_t n) {
             indexA = i * m + m - 1;
             indexB = i * m + m / 2 - 1;
 
-#ifdef DEBUG
-            if (indexA >= n) {
-                printf("upPhase : error : indexA = %u >= %u\n", indexA, n);
-            }
+            #ifdef DEBUG
+                if (indexA >= n) {
+                    printf("upPhase : error : indexA = %u >= %u\n", indexA, n);
+                }
 
-            if (indexB >= n) {
-                printf("upPhase : error : indexB = %u >= %u\n", indexB, n);
-            }
-#endif
+                if (indexB >= n) {
+                    printf("upPhase : error : indexB = %u >= %u\n", indexB, n);
+                }
+            #endif
 
             tmp = h[indexA];
             h[indexA] += h[indexB];
@@ -134,39 +134,35 @@ void blellochScan(uint32_t* h, uint32_t n) {
     // use only 1 block cause blelloch scan algorithm
     // requires sync between blocks in that way
 
-#ifdef TIME
-    auto start1 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto start1 = std::chrono::high_resolution_clock::now();
+    #endif
 
     upPhase<<<1, THREADS>>>(h, n);
     checkRunResult();
 
-#ifdef TIME
-    auto end1 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto end1 = std::chrono::high_resolution_clock::now();
+    #endif
 
-#ifdef TIME
-    auto start2 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto start2 = std::chrono::high_resolution_clock::now();
+    #endif
 
     downPhase<<<1, THREADS>>>(h, n);
     checkRunResult();
 
-#ifdef TIME
-    auto end2 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto end2 = std::chrono::high_resolution_clock::now();
+    #endif
 
-#ifdef TIME
-    auto duration1 =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1);
-    auto duration2 =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2);
+    #ifdef TIME
+        auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1);
+        auto duration2 = std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2);
 
-    std::cerr << "[log] blellochScan.upPhase : " << duration1.count()
-              << std::endl;
-    std::cerr << "[log] blellochScan.downPhase : " << duration2.count()
-              << std::endl;
-#endif
+        std::cerr << "[log] blellochScan.upPhase : " << duration1.count() << std::endl;
+        std::cerr << "[log] blellochScan.downPhase : " << duration2.count() << std::endl;
+    #endif
 }
 
 __global__ void buildResult(TElement* src, uint32_t* h, TElement* dst,
@@ -176,43 +172,43 @@ __global__ void buildResult(TElement* src, uint32_t* h, TElement* dst,
     uint32_t pos, insertIndex;
     TElement element;
 
-#ifdef DEBUG
-    if (idx == 0) {
-        printf("buildResult : h: [");
-        for (uint32_t i = 0; i < 5; ++i) {
-            printf("(%u, %u), ", i, h[i]);
+    #ifdef DEBUG
+        if (idx == 0) {
+            printf("buildResult : h: [");
+            for (uint32_t i = 0; i < 5; ++i) {
+                printf("(%u, %u), ", i, h[i]);
+            }
+
+            printf("..., ");
+
+            for (uint32_t i = m - 20; i < m; ++i) {
+                printf("(%u, %u), ", i, h[i]);
+            }
+
+            printf("]\n");
         }
-
-        printf("..., ");
-
-        for (uint32_t i = m - 20; i < m; ++i) {
-            printf("(%u, %u), ", i, h[i]);
-        }
-
-        printf("]\n");
-    }
-#endif
+    #endif
 
     for (uint32_t i = idx; i < n; i += offsetx) {
         element = src[i];
         insertIndex = (element + 1 == HIST_SIZE) ? 0 : element + 1;
 
-#ifdef DEBUG
-        if (insertIndex >= m) {
-            printf("buildResult : error : insertIndex = %u >= %u\n",
-                   insertIndex, m);
-        }
-#endif
+        #ifdef DEBUG
+            if (insertIndex >= m) {
+                printf("buildResult : error : insertIndex = %u >= %u\n",
+                        insertIndex, m);
+            }
+        #endif
 
         pos = atomicSub(&h[insertIndex], 1) - 1;
 
-#ifdef DEBUG
-        if (pos >= n) {
-            printf("buildResult : error : pos = %u >= %u\n", pos, n);
-            printf("element: %u\n", element);
-            printf("insertIndex: %u\n", insertIndex);
-        }
-#endif
+        #ifdef DEBUG
+            if (pos >= n) {
+                printf("buildResult : error : pos = %u >= %u\n", pos, n);
+                printf("element: %u\n", element);
+                printf("insertIndex: %u\n", insertIndex);
+            }
+        #endif
 
         dst[pos] = element;
     }
@@ -222,52 +218,49 @@ void countSort(TElement* arr, uint32_t* h, TElement* dst, uint32_t n,
                uint32_t m) {
     // create histogram
 
-#ifdef TIME
-    auto start1 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto start1 = std::chrono::high_resolution_clock::now();
+    #endif
 
     hist<<<BLOCKS, THREADS>>>(arr, h, n, m);
     checkRunResult();
 
-#ifdef TIME
-    auto end1 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto end1 = std::chrono::high_resolution_clock::now();
+    #endif
 
-// build prefix sum of histogram
-#ifdef TIME
-    auto start2 = std::chrono::high_resolution_clock::now();
-#endif
+    // build prefix sum of histogram
+    #ifdef TIME
+        auto start2 = std::chrono::high_resolution_clock::now();
+    #endif
 
     blellochScan(h, m);
 
-#ifdef TIME
-    auto end2 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto end2 = std::chrono::high_resolution_clock::now();
+    #endif
 
-// build result array on prefix sum
-#ifdef TIME
-    auto start3 = std::chrono::high_resolution_clock::now();
-#endif
+    // build result array on prefix sum
+    #ifdef TIME
+        auto start3 = std::chrono::high_resolution_clock::now();
+    #endif
 
     buildResult<<<BLOCKS, THREADS>>>(arr, h, dst, n, m);
     checkRunResult();
 
-#ifdef TIME
-    auto end3 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto end3 = std::chrono::high_resolution_clock::now();
+    #endif
 
-#ifdef TIME
-    auto duration1 =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1);
-    auto duration2 =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2);
-    auto duration3 =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end3 - start3);
+    #ifdef TIME
+        auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1);
+        auto duration2 = std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2);
+        auto duration3 = std::chrono::duration_cast<std::chrono::milliseconds>(end3 - start3);
 
-    std::cerr << "[log] countSort.hist : " << duration1.count() << std::endl;
-    std::cerr << "[log] countSort.scan : " << duration2.count() << std::endl;
-    std::cerr << "[log] countSort.build : " << duration3.count() << std::endl;
-#endif
+        std::cerr << "[log] countSort.hist : " << duration1.count() << std::endl;
+        std::cerr << "[log] countSort.scan : " << duration2.count() << std::endl;
+        std::cerr << "[log] countSort.build : " << duration3.count() << std::endl;
+    #endif
 }
 
 TArray readArray() {
@@ -313,57 +306,61 @@ TArray initHist(uint32_t m) {
 }
 
 int main() {
-#ifdef TIME
-    auto start1 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto start1 = std::chrono::high_resolution_clock::now();
+    #endif
 
     TArray hostSrc = readArray();
-    TArray hostResult = {.data = new TElement[hostSrc.size],
-                         .size = hostSrc.size};
+    TArray hostResult = {
+        .data = new TElement[hostSrc.size],
+        .size = hostSrc.size
+    };
 
-#ifdef DEBUG
-    std::cerr << "[log] hostSrc : [";
+    #ifdef DEBUG
+        std::cerr << "[log] hostSrc : [";
 
-    for (uint32_t i = 0; i < hostSrc.size; ++i) {
-        std::cerr << hostSrc.data[i] << ", ";
-    }
+        for (uint32_t i = 0; i < hostSrc.size; ++i) {
+            std::cerr << hostSrc.data[i] << ", ";
+        }
 
-    std::cerr << "]" << std::endl;
-#endif
+        std::cerr << "]" << std::endl;
+    #endif
 
     // init device memory
     TArray h = initHist(HIST_SIZE);
     TArray arr = initDeviceArray(hostSrc.size, hostSrc.data);
     TArray dst = initDeviceArray(hostSrc.size);
 
-#ifdef TIME
-    auto start2 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto start2 = std::chrono::high_resolution_clock::now();
+    #endif
 
     // main part
     countSort(arr.data, h.data, dst.data, arr.size, h.size);
 
-#ifdef TIME
-    auto end2 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto end2 = std::chrono::high_resolution_clock::now();
+    #endif
 
-    cudaMemcpy(hostResult.data, dst.data, sizeof(TElement) * hostResult.size,
-               cudaMemcpyDeviceToHost);
+    cudaMemcpy(
+        hostResult.data,
+        dst.data,
+        sizeof(TElement) * hostResult.size,
+        cudaMemcpyDeviceToHost
+    );
     writeArray(hostResult);
 
-#ifdef TIME
-    auto end1 = std::chrono::high_resolution_clock::now();
-#endif
+    #ifdef TIME
+        auto end1 = std::chrono::high_resolution_clock::now();
+    #endif
 
-#ifdef TIME
-    auto duration1 =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1);
-    auto duration2 =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2);
+    #ifdef TIME
+        auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1);
+        auto duration2 = std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2);
 
-    std::cerr << "[log][time] total: " << duration1.count() << std::endl;
-    std::cerr << "[log][time] kernel: " << duration2.count() << std::endl;
-#endif
+        std::cerr << "[log][time] total: " << duration1.count() << std::endl;
+        std::cerr << "[log][time] kernel: " << duration2.count() << std::endl;
+    #endif
 
     SAVE_CUDA(cudaFree(arr.data));
     SAVE_CUDA(cudaFree(dst.data));
