@@ -1,6 +1,6 @@
-if [ -d "cp/build" ]; then
-    rm -rf cp/build
+if [ -d "build" ]; then
+    rm -rf build
 fi
 
-mkdir cp/build
-g++ cp/main.cpp cp/canvas/canvas.cpp -o cp/build/app
+mkdir build
+g++ main.cpp canvas/canvas.cpp -o build/app
