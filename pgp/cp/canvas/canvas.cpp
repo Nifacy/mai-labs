@@ -34,4 +34,11 @@ namespace Canvas {
         fclose(out);
     }
 
+    void PutPixel(TCanvas *canvas, const std::tuple<unsigned int, unsigned int> &pos, const TColor &color) {
+        unsigned int x = std::get<0>(pos);
+        unsigned int y = std::get<1>(pos);
+
+        canvas->data[y * canvas->width + x] = color;
+    }
+
 }

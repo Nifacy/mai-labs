@@ -26,6 +26,7 @@ namespace Canvas {
     void Destroy(TCanvas *canvas);
 
     void Dump(const TCanvas *canvas, const std::string &filename);
+    void PutPixel(TCanvas *canvas, const std::tuple<unsigned int, unsigned int> &pos, const TColor &color);
 }
 
 #endif  // _CANVAS_H_
