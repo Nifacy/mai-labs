@@ -1,4 +1,5 @@
 import argparse
+import pathlib
 import numpy as np
 
 from dataclasses import dataclass
@@ -38,15 +39,18 @@ def parse_args() -> argparse.Namespace:
         description="Convert a .data image file to JPG format.",
     )
 
-    parser.add_argument("input_file", help="Path to the input .data file.")
-    parser.add_argument("output_file", nargs="?", help="Path to the output JPG file. Defaults to input_file with .jpg extension.")
+    parser.add_argument("input_files_mask", help="Path or mask to the input .data file.")
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    input_file = args.input_file
-    output_file = args.output_file if args.output_file else f"{input_file}.jpg"
+    input_files_mask = args.input_files_mask
 
-    save_as_jpg(read_data_file(input_file), output_file)
+    for input_file in pathlib.Path(".").rglob(input_files_mask):
+        output_file = f"{input_file}.jpg"
+
+        print(f"[log] process {input_file} ...")
+        save_as_jpg(read_data_file(input_file), output_file)
+        print(f"[log] image {output_file} created")
