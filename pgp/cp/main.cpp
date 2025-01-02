@@ -31,7 +31,7 @@ namespace Vector {
 		};
 	}
 
-	TVector3 Norm(TVector3 v) {
+	TVector3 Normalize(TVector3 v) {
 		double l = std::sqrt(Dot(v, v));
 		return {v.x / l, v.y / l, v.z / l};
 	}
@@ -92,7 +92,7 @@ Canvas::TColor ray(Vector::TVector3 pos, Vector::TVector3 dir) {
         double u = Vector::Dot(p, t) / div;
         if (u < 0.0 || u > 1.0) continue;
 
-        Vector::TVector3 q = Prod(t, e1);
+        Vector::TVector3 q = Vector::Prod(t, e1);
         double v = Vector::Dot(q, dir) / div;
         if (v < 0.0 || v + u > 1.0) continue;
 
@@ -124,15 +124,15 @@ void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCan
     double dh = 2.0 / (canvas->height - 1.0);
     double z = 1.0 / tan(angle * M_PI / 360.0);
 
-    Vector::TVector3 bz = Norm(Sub(pv, pc));
-    Vector::TVector3 bx = Norm(Prod(bz, {0.0, 0.0, 1.0}));
-    Vector::TVector3 by = Norm(Prod(bx, bz));
+    Vector::TVector3 bz = Vector::Normalize(Vector::Sub(pv, pc));
+    Vector::TVector3 bx = Vector::Normalize(Vector::Prod(bz, {0.0, 0.0, 1.0}));
+    Vector::TVector3 by = Vector::Normalize(Vector::Prod(bx, bz));
 
     for(unsigned int i = 0; i < canvas->width; i++) {
         for(unsigned int j = 0; j < canvas->height; j++) {
             Vector::TVector3 v = {-1.0 + dw * i, (-1.0 + dh * j) * canvas->height / canvas->width, z};
             Vector::TVector3 dir = Vector::Mult(bx, by, bz, v);
-			Canvas::TColor color = ray(pc, Norm(dir));
+			Canvas::TColor color = ray(pc, Vector::Normalize(dir));
 
             Canvas::PutPixel(canvas, { i, canvas->height - 1 - j }, color);
 		}
