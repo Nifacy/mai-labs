@@ -13,21 +13,19 @@ unsigned int SCREEN_HEIGHT = 480;
 
 
 struct TPolygon {
-    Vector::TVector3 a;
-    Vector::TVector3 b;
-    Vector::TVector3 c;
+    Vector::TVector3 verticles[3];
     Canvas::TColor color;
 };
 
 TPolygon polygons[6];
 
 void build_space() {
-    polygons[0] = {{-5, -5, 0}, {5, -5, 0}, {-5, 5, 0}, {0, 0, 255, 255}};
-    polygons[1] = {{5, 5, 0}, {5, -5, 0}, {-5, 5, 0}, {0, 0, 255, 255}};
-    polygons[2] = {{-2,-2, 4}, {2, -2, 4}, {0, 2, 4}, {128, 0, 128, 255}};
-    polygons[3] = {{-2, -2, 4}, {2, -2, 4}, {0, 0, 7}, {255, 0, 0, 255}};
-    polygons[4] = {{-2,-2, 4}, {0, 0, 7}, {0, 2, 4}, {255, 255, 0, 255}};
-    polygons[5] = {{0, 0, 7}, {2, -2, 4}, {0, 2, 4}, {0, 255, 0, 255}};
+    polygons[0] = {{{-5, -5, 0}, {5, -5, 0}, {-5, 5, 0}}, {0, 0, 255, 255}};
+    polygons[1] = {{{5, 5, 0}, {5, -5, 0}, {-5, 5, 0}}, {0, 0, 255, 255}};
+    polygons[2] = {{{-2,-2, 4}, {2, -2, 4}, {0, 2, 4}}, {128, 0, 128, 255}};
+    polygons[3] = {{{-2, -2, 4}, {2, -2, 4}, {0, 0, 7}}, {255, 0, 0, 255}};
+    polygons[4] = {{{-2,-2, 4}, {0, 0, 7}, {0, 2, 4}}, {255, 255, 0, 255}};
+    polygons[5] = {{{0, 0, 7}, {2, -2, 4}, {0, 2, 4}}, {0, 255, 0, 255}};
 }
 
 Canvas::TColor ray(Vector::TVector3 pos, Vector::TVector3 dir) { 
@@ -35,34 +33,40 @@ Canvas::TColor ray(Vector::TVector3 pos, Vector::TVector3 dir) {
     double ts_min;
 
     for(k = 0; k < 6; k++) {
-        Vector::TVector3 e1 = Vector::Sub(polygons[k].b, polygons[k].a);
-        Vector::TVector3 e2 = Vector::Sub(polygons[k].c, polygons[k].a);
-        Vector::TVector3 p = Vector::Prod(dir, e2);
+        Vector::TVector3 v0 = polygons[k].verticles[0];
+        Vector::TVector3 v1 = polygons[k].verticles[1];
+        Vector::TVector3 v2 = polygons[k].verticles[2];
 
-        double div = Vector::Dot(p, e1);
-        if (fabs(div) < 1e-10) continue;
+        Vector::TVector3 E1 = Vector::Sub(v1, v0);
+        Vector::TVector3 E2 = Vector::Sub(v2, v0);
 
-        Vector::TVector3 t = Vector::Sub(pos, polygons[k].a);
-        double u = Vector::Dot(p, t) / div;
+        Vector::TVector3 D = dir;
+        Vector::TVector3 T = Vector::Sub(pos, v0);
+
+        Vector::TVector3 P = Vector::Prod(D, E2);
+        Vector::TVector3 Q = Vector::Prod(T, E1);
+
+        double divisor = Vector::Dot(P, E1);
+        if (std::fabs(divisor) < 1e-10) continue;
+
+        double u = Vector::Dot(P, T) / divisor;
+        double v = Vector::Dot(Q, D) / divisor;
+        double t = Vector::Dot(Q, E2) / divisor;
+
         if (u < 0.0 || u > 1.0) continue;
-
-        Vector::TVector3 q = Vector::Prod(t, e1);
-        double v = Vector::Dot(q, dir) / div;
         if (v < 0.0 || v + u > 1.0) continue;
+        if (t < 0.0) continue;
 
-        double ts = Vector::Dot(q, e2) / div; 
-        if (ts < 0.0) continue;
-
-        if (k_min == -1 || ts < ts_min) {
+        if (k_min == -1 || t < ts_min) {
             k_min = k;
-            ts_min = ts;
+            ts_min = t;
         }    
     }
 
     if (k_min == -1) {
         return {0, 0, 0, 255};
 	}
-    
+
     return polygons[k_min].color;
 }
 
