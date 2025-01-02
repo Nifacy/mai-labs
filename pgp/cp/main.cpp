@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h> 
 #include <cmath>
+#include <vector>
 
 #include "canvas/canvas.h"
 #include "vector/vector.h"
@@ -17,22 +18,74 @@ struct TPolygon {
     Canvas::TColor color;
 };
 
-TPolygon polygons[6];
 
-void build_space() {
-    polygons[0] = {{{-5, -5, 0}, {5, -5, 0}, {-5, 5, 0}}, {0, 0, 255, 255}};
-    polygons[1] = {{{5, 5, 0}, {5, -5, 0}, {-5, 5, 0}}, {0, 0, 255, 255}};
-    polygons[2] = {{{-2,-2, 4}, {2, -2, 4}, {0, 2, 4}}, {128, 0, 128, 255}};
-    polygons[3] = {{{-2, -2, 4}, {2, -2, 4}, {0, 0, 7}}, {255, 0, 0, 255}};
-    polygons[4] = {{{-2,-2, 4}, {0, 0, 7}, {0, 2, 4}}, {255, 255, 0, 255}};
-    polygons[5] = {{{0, 0, 7}, {2, -2, 4}, {0, 2, 4}}, {0, 255, 0, 255}};
+void buildCube(const Vector::TVector3 &pos, const Canvas::TColor &color, double c, std::vector<TPolygon> &out) {
+    double x = pos.x;
+    double y = pos.y;
+    double z = pos.z;
+
+    out.push_back({
+        .verticles = {{x - c, y - c, z + c}, {x + c, y - c, z + c}, {x - c, y + c, z + c}},
+        .color = color
+    });
+
+    out.push_back({
+        .verticles = {{x + c, y + c, z + c}, {x + c, y - c, z + c}, {x - c, y + c, z + c}},
+        .color = color
+    });
+
+    out.push_back({
+        .verticles = {{x + c, y - c, z - c}, {x + c, y + c, z - c}, {x + c, y + c, z + c}},
+        .color = color
+    });
+
+    out.push_back({
+        .verticles = {{x + c, y - c, z - c}, {x + c, y - c, z + c}, {x + c, y + c, z + c}},
+        .color = color
+    });
+
+    out.push_back({
+        .verticles = {{x - c, y - c, z - c}, {x - c, y + c, z - c}, {x - c, y + c, z + c}},
+        .color = color
+    });
+
+    out.push_back({
+        .verticles = {{x - c, y - c, z - c}, {x - c, y - c, z + c}, {x - c, y + c, z + c}},
+        .color = color
+    });
+
+    out.push_back({
+        .verticles = {{x - c, y - c, z - c}, {x + c, y - c, z - c}, {x - c, y + c, z - c}},
+        .color = color
+    });
+
+    out.push_back({
+        .verticles = {{x + c, y + c, z - c}, {x + c, y - c, z - c}, {x - c, y + c, z - c}},
+        .color = color
+    });
+
+    out.push_back({
+        .verticles = {{x - c, y - c, z - c}, {x - c, y - c, z + c}, {x + c, y - c, z + c}},
+        .color = color
+    });
+
+    out.push_back({
+        .verticles = {{x - c, y - c, z - c}, {x + c, y - c, z - c}, {x + c, y - c, z + c}},
+        .color = color
+    });
 }
 
-Canvas::TColor ray(Vector::TVector3 pos, Vector::TVector3 dir) { 
-    int k, k_min = -1;
+
+void build_space(std::vector<TPolygon> &out) {
+    buildCube({ 0.0, 0.0, 0.0 }, { 0, 255, 0, 255 }, 2.0, out);
+    buildCube({ 0.0, 5.0, 0.0 }, { 255, 0, 0, 255 }, 2.0, out);
+}
+
+Canvas::TColor ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vector<TPolygon> &polygons) { 
+    int k_min = -1;
     double ts_min;
 
-    for(k = 0; k < 6; k++) {
+    for(unsigned int k = 0; k < polygons.size(); k++) {
         Vector::TVector3 v0 = polygons[k].verticles[0];
         Vector::TVector3 v1 = polygons[k].verticles[1];
         Vector::TVector3 v2 = polygons[k].verticles[2];
@@ -77,7 +130,7 @@ out[2 * w * h]
 
 biff[20 * w * h]
 */
-void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCanvas *canvas) {
+void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCanvas *canvas, const std::vector<TPolygon> &polygons) {
     double dw = 2.0 / (canvas->width - 1.0);
     double dh = 2.0 / (canvas->height - 1.0);
     double z = 1.0 / tan(angle * M_PI / 360.0);
@@ -90,7 +143,7 @@ void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCan
         for(unsigned int j = 0; j < canvas->height; j++) {
             Vector::TVector3 v = {-1.0 + dw * i, (-1.0 + dh * j) * canvas->height / canvas->width, z};
             Vector::TVector3 dir = Vector::Mult(bx, by, bz, v);
-			Canvas::TColor color = ray(pc, Vector::Normalize(dir));
+			Canvas::TColor color = ray(pc, Vector::Normalize(dir), polygons);
 
             Canvas::PutPixel(canvas, { i, canvas->height - 1 - j }, color);
 		}
@@ -99,15 +152,17 @@ void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCan
 
 
 int main() {
-    build_space();
     char buff[256];
 
+    std::vector<TPolygon> polygons;
     Vector::TVector3 cameraPos, pv;
 
     Canvas::TCanvas canvas;
     Canvas::Init(&canvas, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    for(unsigned int k = 0; k < 5; k++) { 
+    build_space(polygons);
+
+    for(unsigned int k = 0; k < 128; k += 10) { 
         cameraPos = (Vector::TVector3) {
 			6.0 * sin(0.05 * k),
 			6.0 * cos(0.05 * k),
@@ -120,7 +175,7 @@ int main() {
 			0.0
 		};
 
-        render(cameraPos, pv, 120.0, &canvas);
+        render(cameraPos, pv, 120.0, &canvas, polygons);
     
         sprintf(buff, "build/%03d.data", k);
         printf("%d: %s\n", k, buff);    
