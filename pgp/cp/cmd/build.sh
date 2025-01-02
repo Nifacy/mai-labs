@@ -1,6 +1,6 @@
 if [ -d "build" ]; then
-    rm -rf build
+    rm -rf "build"
 fi
 
-mkdir build
-g++ main.cpp canvas/canvas.cpp -o build/app
+mkdir "build"
+g++ main.cpp vector/vector.cpp canvas/canvas.cpp -o build/app
