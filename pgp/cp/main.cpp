@@ -22,6 +22,12 @@ struct TPolygon {
 };
 
 
+struct THit {
+    bool exists;
+    double t;
+};
+
+
 const double EPS = 1e-3;
 
 
@@ -129,8 +135,12 @@ void build_space(std::vector<TPolygon> &out) {
 }
 
 
-Vector::TVector3 lightPos = { 0.0, 0.0, 1.0 };
+Vector::TVector3 lightPos = { 0.0, -6.0, 7.0 };
 Vector::TVector3 lightColor = { 1.0, 1.0, 1.0 };
+
+const double EMBIENT_COEF = 0.3;
+const double SPECULAR_COEF = 1.0;
+const double DIFFUSE_COEF = 1.0;
 
 
 Vector::TVector3 GetPolygonNormal(const TPolygon &polygon) {
@@ -148,38 +158,87 @@ Vector::TVector3 Reflect(const Vector::TVector3 &v, const Vector::TVector3 &norm
 }
 
 
-Vector::TVector3 GetColor(double embientLight, const TPolygon &polygon, const Vector::TVector3 &hitPos, const Vector::TVector3& dir) {
-    // embient color
-    Vector::TVector3 embientColor = Vector::Mult(embientLight, polygon.color);
+THit CheckHitWithPolygon(const Vector::TVector3 &pos, const Vector::TVector3 &dir, const TPolygon &polygon) {
+    THit emptyHit = { .exists = false, .t = 0.0 };
 
-    // diffuse color
-    double k_d = 1.0;
-    Vector::TVector3 l = Vector::Normalize(Vector::Sub(lightPos, hitPos));
+    Vector::TVector3 v0 = polygon.verticles[0];
+    Vector::TVector3 v1 = polygon.verticles[1];
+    Vector::TVector3 v2 = polygon.verticles[2];
+
+    Vector::TVector3 E1 = Vector::Sub(v1, v0);
+    Vector::TVector3 E2 = Vector::Sub(v2, v0);
+
+    Vector::TVector3 D = dir;
+    Vector::TVector3 T = Vector::Sub(pos, v0);
+
+    Vector::TVector3 P = Vector::Prod(D, E2);
+    Vector::TVector3 Q = Vector::Prod(T, E1);
+
+    double divisor = Vector::Dot(P, E1);
+    if (std::fabs(divisor) < 1e-10) return emptyHit;
+
+    double u = Vector::Dot(P, T) / divisor;
+    double v = Vector::Dot(Q, D) / divisor;
+    double t = Vector::Dot(Q, E2) / divisor;
+
+    if (u < 0.0 || u > 1.0) return emptyHit;
+    if (v < 0.0 || v + u > 1.0) return emptyHit;
+    if (t < 0.0) return emptyHit;
+
+    return { .exists = true, .t = t };
+}
+
+
+
+Vector::TVector3 GetColor(
+    const Vector::TVector3 &hitPos,
+    const Vector::TVector3& dir,
+    size_t polygonId,
+    const std::vector<TPolygon> &polygons
+) {
+    const TPolygon &polygon = polygons[polygonId];
+    Vector::TVector3 lightDir = Vector::Normalize(Vector::Sub(hitPos, lightPos));
+    Vector::TVector3 dirNormalized = Vector::Normalize(dir);
+    Vector::TVector3 resultColor = Vector::Mult(polygon.color, lightColor);
+
+    // shade coef
+    double shadeCoef = 1.0;
+    THit currHit = CheckHitWithPolygon(lightPos, lightDir, polygons[polygonId]);
+    if (!currHit.exists) {
+        std::cerr << "[error] unexpected not existent hit\n";
+        exit(1);
+    }
+
+    for (size_t i = 0; i < polygons.size(); ++i) {
+        if (i == polygonId) continue;
+        THit hit = CheckHitWithPolygon(lightPos, lightDir, polygons[i]);
+
+        if (hit.exists && hit.t < currHit.t) {
+            shadeCoef *= polygons[i].transparent;
+        }
+    }
+
+    // embient light
+    Vector::TVector3 embientColor = Vector::Mult(EMBIENT_COEF, polygon.color);
+
+    // diffuse light
+    Vector::TVector3 l = Vector::Mult(-1.0, lightDir);
     Vector::TVector3 n = GetPolygonNormal(polygon);
-    double cosPhi = std::abs(Vector::Dot(n, l));
-    Vector::TVector3 v = Vector::Mult(polygon.color, lightColor);
-    Vector::TVector3 diffuseColor = Vector::Mult(k_d * cosPhi, v);
+    double diffuseAngle = std::abs(Vector::Dot(n, l));
+    double diffuseCoef = DIFFUSE_COEF * diffuseAngle;
 
-    // specular color
-    Vector::TVector3 reflectedLightDirection = Reflect(
+    // specular light
+    Vector::TVector3 reflectedLightDirection = Vector::Normalize(Reflect(
         Vector::Sub(hitPos, lightPos),
         GetPolygonNormal(polygon)
-    );
-
-    reflectedLightDirection = Vector::Normalize(reflectedLightDirection);
-    Vector::TVector3 dirNormalized = Vector::Normalize(dir);
-
-    double angle = std::abs(Vector::Dot(reflectedLightDirection, dirNormalized));
-    double specularCoef = std::pow(angle, 12);
-
-    double k_s = 1.0;
-    Vector::TVector3 specularColor = Vector::Mult(k_s * specularCoef, lightColor);
+    ));
+    double specularAngle = std::abs(Vector::Dot(reflectedLightDirection, dirNormalized));
+    double specularCoef = SPECULAR_COEF * std::pow(specularAngle, 12);
 
     // total color
     Vector::TVector3 color = { 0.0, 0.0, 0.0 };
+    color = Vector::Add(color, Vector::Mult(shadeCoef * (diffuseCoef + specularCoef), resultColor));
     color = Vector::Add(color, embientColor);
-    color = Vector::Add(color, diffuseColor);
-    color = Vector::Add(color, specularColor);
     color = {
         std::min(1.0, std::max(0.0, color.x)),
         std::min(1.0, std::max(0.0, color.y)),
@@ -208,34 +267,17 @@ Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vect
     double ts_min;
 
     for(unsigned int k = 0; k < polygons.size(); k++) {
-        Vector::TVector3 v0 = polygons[k].verticles[0];
-        Vector::TVector3 v1 = polygons[k].verticles[1];
-        Vector::TVector3 v2 = polygons[k].verticles[2];
+        THit hit = CheckHitWithPolygon(pos, dir, polygons[k]);
+        double t = hit.t;
 
-        Vector::TVector3 E1 = Vector::Sub(v1, v0);
-        Vector::TVector3 E2 = Vector::Sub(v2, v0);
-
-        Vector::TVector3 D = dir;
-        Vector::TVector3 T = Vector::Sub(pos, v0);
-
-        Vector::TVector3 P = Vector::Prod(D, E2);
-        Vector::TVector3 Q = Vector::Prod(T, E1);
-
-        double divisor = Vector::Dot(P, E1);
-        if (std::fabs(divisor) < 1e-10) continue;
-
-        double u = Vector::Dot(P, T) / divisor;
-        double v = Vector::Dot(Q, D) / divisor;
-        double t = Vector::Dot(Q, E2) / divisor;
-
-        if (u < 0.0 || u > 1.0) continue;
-        if (v < 0.0 || v + u > 1.0) continue;
-        if (t < 0.0) continue;
+        if (!hit.exists) {
+            continue;
+        }
 
         if (k_min == -1 || t < ts_min) {
             k_min = k;
             ts_min = t;
-        }    
+        }
     }
 
     if (k_min == -1) {
@@ -244,7 +286,7 @@ Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vect
 
     TPolygon hitPolygon = polygons[k_min];
     Vector::TVector3 hitPosition = Vector::Add(pos, Vector::Mult(ts_min, dir));
-    Vector::TVector3 hitColor = GetColor(0.6, hitPolygon, hitPosition, dir);
+    Vector::TVector3 hitColor = GetColor(hitPosition, dir, k_min, polygons);
 
     std::pair<Vector::TVector3, Vector::TVector3> nextRay = GetReflectedRay(pos, dir, hitPolygon, hitPosition);
     Vector::TVector3 reflectedColor = ray(nextRay.first, nextRay.second, polygons, depth + 1);
