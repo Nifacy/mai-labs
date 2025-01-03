@@ -103,9 +103,16 @@ void buildCube(const Vector::TVector3 &pos, const Vector::TVector3 &color, doubl
 
 
 void build_space(std::vector<TPolygon> &out) {
-    buildCube({ 0.0, -3.0, 3.0 }, { 0.5, 0.0, 0.0 }, 2.0, 1.0, 0.0, out);
+    buildCube({ 0.0, -3.0, 3.0 }, { 1.0, 0.0, 0.0 }, 2.0, 0.0, 0.0, out);
     // buildCube({ 0.0, 5.0, 0.0 }, { 0.0, 1.0, 0.0 }, 2.0, 0.5, 0.0, out);
     buildCube({ 0.0, 0.0, -8.0 }, { 1.0, 1.0, 1.0 }, 8.0, 0.0, 0.0, out);
+}
+
+
+Vector::TVector3 GetColor(double embientLight, const TPolygon &polygon) {
+    Vector::TVector3 color = { 0.0, 0.0, 0.0 };
+    color = Vector::Add(color, Vector::Mult(embientLight, polygon.color));
+    return color;
 }
 
 
@@ -178,7 +185,7 @@ Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vect
 	}
 
     TPolygon hitPolygon = polygons[k_min];
-    Vector::TVector3 hitColor = hitPolygon.color;
+    Vector::TVector3 hitColor = GetColor(0.6, hitPolygon);
 
     std::pair<Vector::TVector3, Vector::TVector3> nextRay = GetReflectedRay(pos, dir, hitPolygon, ts_min);
     Vector::TVector3 reflectedColor = ray(nextRay.first, nextRay.second, polygons, depth + 1);
