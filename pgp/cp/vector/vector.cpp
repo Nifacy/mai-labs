@@ -42,4 +42,8 @@ namespace Vector {
         };
     }
 
+    TVector3 Mult(double coef, TVector3 v) {
+        return { coef * v.x, coef * v.y, coef * v.z };
+    }
+
 }
