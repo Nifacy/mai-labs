@@ -2,19 +2,11 @@ import argparse
 import pathlib
 import numpy as np
 
-from dataclasses import dataclass
 from PIL import Image
 
 
-@dataclass
-class _Image:
-    width: int
-    height: int
-    data: np.ndarray[int]
-
-
-def read_data_file(filepath: str) -> _Image:
-    with open(filepath, "rb") as file:
+def read_data_file(input_path: pathlib.Path) -> Image.Image:
+    with input_path.open("rb") as file:
         width = int.from_bytes(file.read(4), byteorder="little")
         height = int.from_bytes(file.read(4), byteorder="little")
 
@@ -22,16 +14,11 @@ def read_data_file(filepath: str) -> _Image:
         img_data = np.frombuffer(raw_data, dtype=np.uint8)
         img_data = img_data.reshape((height, width, 4))
 
-    return _Image(
-        width=width,
-        height=height,
-        data=img_data,
-    )
+    return Image.fromarray(img_data[:, :, :3], "RGB")
 
 
-def save_as_jpg(image: _Image, output_path: str) -> None:
-    rgb_image = Image.fromarray(image.data[:, :, :3], "RGB")
-    rgb_image.save(output_path, "JPEG")
+def save_as_jpg(image: Image.Image, output_path: pathlib.Path) -> None:
+    image.save(str(output_path.absolute()), "JPEG")
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,7 +36,7 @@ if __name__ == "__main__":
     input_files_mask = args.input_files_mask
 
     for input_file in pathlib.Path(".").rglob(input_files_mask):
-        output_file = f"{input_file}.jpg"
+        output_file = pathlib.Path(f"{input_file}.jpg")
 
         print(f"[log] process {input_file} ...")
         save_as_jpg(read_data_file(input_file), output_file)
