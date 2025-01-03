@@ -18,13 +18,14 @@ struct TPolygon {
     Vector::TVector3 verticles[3];
     Vector::TVector3 color;
     double reflection = 0.0;
+    double transparent = 0.0;
 };
 
 
 const double EPS = 1e-3;
 
 
-void buildCube(const Vector::TVector3 &pos, const Vector::TVector3 &color, double c, double reflection, std::vector<TPolygon> &out) {
+void buildCube(const Vector::TVector3 &pos, const Vector::TVector3 &color, double c, double reflection, double transparent, std::vector<TPolygon> &out) {
     double x = pos.x;
     double y = pos.y;
     double z = pos.z;
@@ -32,68 +33,79 @@ void buildCube(const Vector::TVector3 &pos, const Vector::TVector3 &color, doubl
     out.push_back({
         .verticles = {{x - c, y - c, z + c}, {x + c, y - c, z + c}, {x - c, y + c, z + c}},
         .color = color,
-        .reflection = reflection
+        .reflection = reflection,
+        .transparent = transparent
     });
 
     out.push_back({
         .verticles = {{x + c, y + c, z + c}, {x + c, y - c, z + c}, {x - c, y + c, z + c}},
         .color = color,
-        .reflection = reflection
+        .reflection = reflection,
+        .transparent = transparent
     });
 
     out.push_back({
         .verticles = {{x + c, y - c, z - c}, {x + c, y + c, z - c}, {x + c, y + c, z + c}},
         .color = color,
-        .reflection = reflection
+        .reflection = reflection,
+        .transparent = transparent
     });
 
     out.push_back({
         .verticles = {{x + c, y - c, z - c}, {x + c, y - c, z + c}, {x + c, y + c, z + c}},
         .color = color,
-        .reflection = reflection
+        .reflection = reflection,
+        .transparent = transparent
     });
 
     out.push_back({
         .verticles = {{x - c, y - c, z - c}, {x - c, y + c, z - c}, {x - c, y + c, z + c}},
         .color = color,
-        .reflection = reflection
+        .reflection = reflection,
+        .transparent = transparent
     });
 
     out.push_back({
         .verticles = {{x - c, y - c, z - c}, {x - c, y - c, z + c}, {x - c, y + c, z + c}},
         .color = color,
-        .reflection = reflection
+        .reflection = reflection,
+        .transparent = transparent
     });
 
     out.push_back({
         .verticles = {{x - c, y - c, z - c}, {x + c, y - c, z - c}, {x - c, y + c, z - c}},
         .color = color,
-        .reflection = reflection
+        .reflection = reflection,
+        .transparent = transparent
     });
 
     out.push_back({
         .verticles = {{x + c, y + c, z - c}, {x + c, y - c, z - c}, {x - c, y + c, z - c}},
         .color = color,
-        .reflection = reflection
+        .reflection = reflection,
+        .transparent = transparent
     });
 
     out.push_back({
         .verticles = {{x - c, y - c, z - c}, {x - c, y - c, z + c}, {x + c, y - c, z + c}},
         .color = color,
-        .reflection = reflection
+        .reflection = reflection,
+        .transparent = transparent
     });
 
     out.push_back({
         .verticles = {{x - c, y - c, z - c}, {x + c, y - c, z - c}, {x + c, y - c, z + c}},
         .color = color,
-        .reflection = reflection
+        .reflection = reflection,
+        .transparent = transparent
     });
 }
 
 
 void build_space(std::vector<TPolygon> &out) {
-    buildCube({ 0.0, -3.0, 3.0 }, { 1.0, 0.0, 0.0 }, 2.0, 0.5, out);
-    buildCube({ 0.0, 5.0, 0.0 }, { 0.0, 1.0, 0.0 }, 2.0, 0.5, out);
+    buildCube({ 0.0, -3.0, 3.0 }, { 0.5, 0.0, 0.0 }, 2.0, 1.0, 0.0, out);
+    // buildCube({ 0.0, 5.0, 0.0 }, { 0.0, 1.0, 0.0 }, 2.0, 0.5, 0.0, out);
+    buildCube({ 0.0, 0.0, -8.0 }, { 1.0, 1.0, 1.0 }, 8.0, 0.0, 0.0, out);
 }
 
 
@@ -171,9 +183,17 @@ Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vect
     std::pair<Vector::TVector3, Vector::TVector3> nextRay = GetReflectedRay(pos, dir, hitPolygon, ts_min);
     Vector::TVector3 reflectedColor = ray(nextRay.first, nextRay.second, polygons, depth + 1);
 
-    Vector::TVector3 resultColor = Vector::Add(hitColor, Vector::Mult(hitPolygon.reflection, reflectedColor));
+    Vector::TVector3 refractedDir = dir;
+    Vector::TVector3 hitPosition = Vector::Add(pos, Vector::Mult(ts_min, dir));
+    Vector::TVector3 refractedPos = Vector::Add(hitPosition, Vector::Mult(EPS, refractedDir));
+    Vector::TVector3 refractedColor = ray(refractedPos, refractedDir, polygons, depth + 1);
 
-    return resultColor;
+    Vector::TVector3 resultColor = Vector::Add(
+        Vector::Mult(hitPolygon.transparent, refractedColor),
+        Vector::Add({ 1.0, 1.0, 1.0 }, Vector::Mult(hitPolygon.reflection, reflectedColor))
+    );
+
+    return { hitColor.x * resultColor.x, hitColor.y * resultColor.y, hitColor.z * resultColor.z };
 }
 
 
