@@ -30,6 +30,7 @@ void buildCube(const Vector::TVector3 &pos, const Vector::TVector3 &color, doubl
     double y = pos.y;
     double z = pos.z;
 
+    // top
     out.push_back({
         .verticles = {{x - c, y - c, z + c}, {x + c, y - c, z + c}, {x - c, y + c, z + c}},
         .color = color,
@@ -38,12 +39,13 @@ void buildCube(const Vector::TVector3 &pos, const Vector::TVector3 &color, doubl
     });
 
     out.push_back({
-        .verticles = {{x + c, y + c, z + c}, {x + c, y - c, z + c}, {x - c, y + c, z + c}},
+        .verticles = {{x + c, y - c, z + c}, {x + c, y + c, z + c}, {x - c, y + c, z + c}},
         .color = color,
         .reflection = reflection,
         .transparent = transparent
     });
 
+    // right
     out.push_back({
         .verticles = {{x + c, y - c, z - c}, {x + c, y + c, z - c}, {x + c, y + c, z + c}},
         .color = color,
@@ -58,6 +60,7 @@ void buildCube(const Vector::TVector3 &pos, const Vector::TVector3 &color, doubl
         .transparent = transparent
     });
 
+    // left
     out.push_back({
         .verticles = {{x - c, y - c, z - c}, {x - c, y + c, z - c}, {x - c, y + c, z + c}},
         .color = color,
@@ -72,6 +75,7 @@ void buildCube(const Vector::TVector3 &pos, const Vector::TVector3 &color, doubl
         .transparent = transparent
     });
 
+    // bottom
     out.push_back({
         .verticles = {{x - c, y - c, z - c}, {x + c, y - c, z - c}, {x - c, y + c, z - c}},
         .color = color,
@@ -86,6 +90,7 @@ void buildCube(const Vector::TVector3 &pos, const Vector::TVector3 &color, doubl
         .transparent = transparent
     });
 
+    // back
     out.push_back({
         .verticles = {{x - c, y - c, z - c}, {x - c, y - c, z + c}, {x + c, y - c, z + c}},
         .color = color,
@@ -95,6 +100,21 @@ void buildCube(const Vector::TVector3 &pos, const Vector::TVector3 &color, doubl
 
     out.push_back({
         .verticles = {{x - c, y - c, z - c}, {x + c, y - c, z - c}, {x + c, y - c, z + c}},
+        .color = color,
+        .reflection = reflection,
+        .transparent = transparent
+    });
+
+    // front
+    out.push_back({
+        .verticles = {{x - c, y + c, z - c}, {x - c, y + c, z + c}, {x + c, y + c, z + c}},
+        .color = color,
+        .reflection = reflection,
+        .transparent = transparent
+    });
+
+    out.push_back({
+        .verticles = {{x - c, y + c, z - c}, {x + c, y + c, z - c}, {x + c, y + c, z + c}},
         .color = color,
         .reflection = reflection,
         .transparent = transparent
