@@ -22,6 +22,12 @@ struct TPolygon {
 };
 
 
+struct TLight {
+    Vector::TVector3 position;
+    Vector::TVector3 color;
+};
+
+
 struct THit {
     bool exists;
     double t;
@@ -135,12 +141,9 @@ void build_space(std::vector<TPolygon> &out) {
 }
 
 
-Vector::TVector3 lightPos = { 0.0, -6.0, 7.0 };
-Vector::TVector3 lightColor = { 1.0, 1.0, 1.0 };
-
 const double EMBIENT_COEF = 0.3;
-const double SPECULAR_COEF = 1.0;
-const double DIFFUSE_COEF = 1.0;
+const double SPECULAR_COEF = 0.3;
+const double DIFFUSE_COEF = 0.3;
 
 
 Vector::TVector3 GetPolygonNormal(const TPolygon &polygon) {
@@ -194,58 +197,68 @@ Vector::TVector3 GetColor(
     const Vector::TVector3 &hitPos,
     const Vector::TVector3& dir,
     size_t polygonId,
-    const std::vector<TPolygon> &polygons
+    const std::vector<TPolygon> &polygons,
+    const std::vector<TLight> &lights
 ) {
-    const TPolygon &polygon = polygons[polygonId];
-    Vector::TVector3 lightDir = Vector::Normalize(Vector::Sub(hitPos, lightPos));
-    Vector::TVector3 dirNormalized = Vector::Normalize(dir);
-    Vector::TVector3 resultColor = Vector::Mult(polygon.color, lightColor);
+    Vector::TVector3 totalColor = { 0.0, 0.0, 0.0 };
 
-    // shade coef
-    double shadeCoef = 1.0;
-    THit currHit = CheckHitWithPolygon(lightPos, lightDir, polygons[polygonId]);
-    if (!currHit.exists) {
-        std::cerr << "[error] unexpected not existent hit\n";
-        exit(1);
-    }
+    for (const TLight &light : lights) {
+        Vector::TVector3 lightPos = light.position;
+        Vector::TVector3 lightColor = light.color;
 
-    for (size_t i = 0; i < polygons.size(); ++i) {
-        if (i == polygonId) continue;
-        THit hit = CheckHitWithPolygon(lightPos, lightDir, polygons[i]);
+        const TPolygon &polygon = polygons[polygonId];
+        Vector::TVector3 lightDir = Vector::Normalize(Vector::Sub(hitPos, lightPos));
+        Vector::TVector3 dirNormalized = Vector::Normalize(dir);
+        Vector::TVector3 resultColor = Vector::Mult(polygon.color, lightColor);
 
-        if (hit.exists && hit.t < currHit.t) {
-            shadeCoef *= polygons[i].transparent;
+        // shade coef
+        double shadeCoef = 1.0;
+        THit currHit = CheckHitWithPolygon(lightPos, lightDir, polygons[polygonId]);
+        if (!currHit.exists) {
+            std::cerr << "[error] unexpected not existent hit\n";
+            exit(1);
         }
+
+        for (size_t i = 0; i < polygons.size(); ++i) {
+            if (i == polygonId) continue;
+            THit hit = CheckHitWithPolygon(lightPos, lightDir, polygons[i]);
+
+            if (hit.exists && hit.t < currHit.t) {
+                shadeCoef *= polygons[i].transparent;
+            }
+        }
+
+        // embient light
+        Vector::TVector3 embientColor = Vector::Mult(EMBIENT_COEF, polygon.color);
+
+        // diffuse light
+        Vector::TVector3 l = Vector::Mult(-1.0, lightDir);
+        Vector::TVector3 n = GetPolygonNormal(polygon);
+        double diffuseAngle = std::abs(Vector::Dot(n, l));
+        double diffuseCoef = DIFFUSE_COEF * diffuseAngle;
+
+        // specular light
+        Vector::TVector3 reflectedLightDirection = Vector::Normalize(Reflect(
+            Vector::Sub(hitPos, lightPos),
+            GetPolygonNormal(polygon)
+        ));
+        double specularAngle = std::abs(Vector::Dot(reflectedLightDirection, dirNormalized));
+        double specularCoef = SPECULAR_COEF * std::pow(specularAngle, 12);
+
+        // total color
+        Vector::TVector3 color = { 0.0, 0.0, 0.0 };
+        color = Vector::Add(color, Vector::Mult(shadeCoef * (diffuseCoef + specularCoef), resultColor));
+        color = Vector::Add(color, embientColor);
+        totalColor = Vector::Add(totalColor, color);
     }
 
-    // embient light
-    Vector::TVector3 embientColor = Vector::Mult(EMBIENT_COEF, polygon.color);
-
-    // diffuse light
-    Vector::TVector3 l = Vector::Mult(-1.0, lightDir);
-    Vector::TVector3 n = GetPolygonNormal(polygon);
-    double diffuseAngle = std::abs(Vector::Dot(n, l));
-    double diffuseCoef = DIFFUSE_COEF * diffuseAngle;
-
-    // specular light
-    Vector::TVector3 reflectedLightDirection = Vector::Normalize(Reflect(
-        Vector::Sub(hitPos, lightPos),
-        GetPolygonNormal(polygon)
-    ));
-    double specularAngle = std::abs(Vector::Dot(reflectedLightDirection, dirNormalized));
-    double specularCoef = SPECULAR_COEF * std::pow(specularAngle, 12);
-
-    // total color
-    Vector::TVector3 color = { 0.0, 0.0, 0.0 };
-    color = Vector::Add(color, Vector::Mult(shadeCoef * (diffuseCoef + specularCoef), resultColor));
-    color = Vector::Add(color, embientColor);
-    color = {
-        std::min(1.0, std::max(0.0, color.x)),
-        std::min(1.0, std::max(0.0, color.y)),
-        std::min(1.0, std::max(0.0, color.z))
+    totalColor = {
+        std::min(1.0, std::max(0.0, totalColor.x)),
+        std::min(1.0, std::max(0.0, totalColor.y)),
+        std::min(1.0, std::max(0.0, totalColor.z))
     };
 
-    return color;
+    return totalColor;
 }
 
 
@@ -258,7 +271,7 @@ std::pair<Vector::TVector3, Vector::TVector3> GetReflectedRay(const Vector::TVec
     return { nextPos, nextDir };
 }
 
-Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vector<TPolygon> &polygons, int depth) { 
+Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vector<TPolygon> &polygons, const std::vector<TLight> &lights, int depth) { 
     if (depth > 2) {
         return { 0.0, 0.0, 0.0 };
     }
@@ -286,14 +299,14 @@ Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vect
 
     TPolygon hitPolygon = polygons[k_min];
     Vector::TVector3 hitPosition = Vector::Add(pos, Vector::Mult(ts_min, dir));
-    Vector::TVector3 hitColor = GetColor(hitPosition, dir, k_min, polygons);
+    Vector::TVector3 hitColor = GetColor(hitPosition, dir, k_min, polygons, lights);
 
     std::pair<Vector::TVector3, Vector::TVector3> nextRay = GetReflectedRay(pos, dir, hitPolygon, hitPosition);
-    Vector::TVector3 reflectedColor = ray(nextRay.first, nextRay.second, polygons, depth + 1);
+    Vector::TVector3 reflectedColor = ray(nextRay.first, nextRay.second, polygons, lights, depth + 1);
 
     Vector::TVector3 refractedDir = dir;
     Vector::TVector3 refractedPos = Vector::Add(hitPosition, Vector::Mult(EPS, refractedDir));
-    Vector::TVector3 refractedColor = ray(refractedPos, refractedDir, polygons, depth + 1);
+    Vector::TVector3 refractedColor = ray(refractedPos, refractedDir, polygons, lights, depth + 1);
 
     Vector::TVector3 resultColor = Vector::Add(
         Vector::Mult(hitPolygon.transparent, refractedColor),
@@ -320,7 +333,7 @@ out[2 * w * h]
 
 biff[20 * w * h]
 */
-void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCanvas *canvas, const std::vector<TPolygon> &polygons) {
+void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCanvas *canvas, const std::vector<TPolygon> &polygons, const std::vector<TLight> &lights) {
     double dw = 2.0 / (canvas->width - 1.0);
     double dh = 2.0 / (canvas->height - 1.0);
     double z = 1.0 / tan(angle * M_PI / 360.0);
@@ -333,7 +346,7 @@ void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCan
         for(unsigned int j = 0; j < canvas->height; j++) {
             Vector::TVector3 v = {-1.0 + dw * i, (-1.0 + dh * j) * canvas->height / canvas->width, z};
             Vector::TVector3 dir = Vector::Mult(bx, by, bz, v);
-			Vector::TVector3 colorVector = ray(pc, Vector::Normalize(dir), polygons, 0);
+			Vector::TVector3 colorVector = ray(pc, Vector::Normalize(dir), polygons, lights, 0);
             Canvas::TColor color = VectorToColor(colorVector);
 
             Canvas::PutPixel(canvas, { i, canvas->height - 1 - j }, color);
@@ -353,6 +366,11 @@ int main() {
 
     build_space(polygons);
 
+    std::vector<TLight> lights = {
+        { .position = { 0.0, -6.0, 7.0 }, .color = { 0.5, 0.5, 0.5 } },
+        { .position = { 0.0, 6.0, 7.0 }, .color = { 0.5, 0.5, 0.5 } }
+    };
+
     for(unsigned int k = 0; k < 1; k += 1) { 
         cameraPos = { -6.0, 0.0, 7.0 };
         pv = { 1.0, 0.0, -1.0 };
@@ -369,7 +387,7 @@ int main() {
 		// 	-1.0
 		// };
 
-        render(cameraPos, pv, 120.0, &canvas, polygons);
+        render(cameraPos, pv, 120.0, &canvas, polygons, lights);
     
         sprintf(buff, "build/%03d.data", k);
         printf("%d: %s\n", k, buff);    
