@@ -129,7 +129,7 @@ void build_space(std::vector<TPolygon> &out) {
 }
 
 
-Vector::TVector3 lightPos = { 0.0, 6.0, 6.0 };
+Vector::TVector3 lightPos = { 0.0, 0.0, 1.0 };
 Vector::TVector3 lightColor = { 1.0, 1.0, 1.0 };
 
 
@@ -137,32 +137,6 @@ Vector::TVector3 GetPolygonNormal(const TPolygon &polygon) {
     Vector::TVector3 v1 = Vector::Sub(polygon.verticles[1], polygon.verticles[0]);
     Vector::TVector3 v2 = Vector::Sub(polygon.verticles[2], polygon.verticles[0]);
     return Vector::Normalize(Vector::Prod(v1, v2));
-}
-
-
-Vector::TVector3 GetColor(double embientLight, const TPolygon &polygon, const Vector::TVector3 &hitPos) {
-    // embient color
-    Vector::TVector3 embientColor = Vector::Mult(embientLight, polygon.color);
-
-    // diffuse color
-    double k_d = 1.0;
-    Vector::TVector3 l = Vector::Normalize(Vector::Sub(lightPos, hitPos));
-    Vector::TVector3 n = GetPolygonNormal(polygon);
-    double cosPhi = std::abs(Vector::Dot(n, l));
-    Vector::TVector3 v = Vector::Mult(polygon.color, lightColor);
-    Vector::TVector3 diffuseColor = Vector::Mult(k_d * cosPhi, v);
-
-    // total color
-    Vector::TVector3 color = { 0.0, 0.0, 0.0 };
-    color = Vector::Add(color, embientColor);
-    color = Vector::Add(color, diffuseColor);
-    color = {
-        std::min(1.0, std::max(0.0, color.x)),
-        std::min(1.0, std::max(0.0, color.y)),
-        std::min(1.0, std::max(0.0, color.z))
-    };
-
-    return color;
 }
 
 
@@ -174,10 +148,51 @@ Vector::TVector3 Reflect(const Vector::TVector3 &v, const Vector::TVector3 &norm
 }
 
 
-std::pair<Vector::TVector3, Vector::TVector3> GetReflectedRay(const Vector::TVector3 &pos, const Vector::TVector3 &dir, const TPolygon &polygon, double t) {
+Vector::TVector3 GetColor(double embientLight, const TPolygon &polygon, const Vector::TVector3 &hitPos, const Vector::TVector3& dir) {
+    // embient color
+    Vector::TVector3 embientColor = Vector::Mult(embientLight, polygon.color);
+
+    // diffuse color
+    double k_d = 1.0;
+    Vector::TVector3 l = Vector::Normalize(Vector::Sub(lightPos, hitPos));
+    Vector::TVector3 n = GetPolygonNormal(polygon);
+    double cosPhi = std::abs(Vector::Dot(n, l));
+    Vector::TVector3 v = Vector::Mult(polygon.color, lightColor);
+    Vector::TVector3 diffuseColor = Vector::Mult(k_d * cosPhi, v);
+
+    // specular color
+    Vector::TVector3 reflectedLightDirection = Reflect(
+        Vector::Sub(hitPos, lightPos),
+        GetPolygonNormal(polygon)
+    );
+
+    reflectedLightDirection = Vector::Normalize(reflectedLightDirection);
+    Vector::TVector3 dirNormalized = Vector::Normalize(dir);
+
+    double angle = std::abs(Vector::Dot(reflectedLightDirection, dirNormalized));
+    double specularCoef = std::pow(angle, 12);
+
+    double k_s = 1.0;
+    Vector::TVector3 specularColor = Vector::Mult(k_s * specularCoef, lightColor);
+
+    // total color
+    Vector::TVector3 color = { 0.0, 0.0, 0.0 };
+    color = Vector::Add(color, embientColor);
+    color = Vector::Add(color, diffuseColor);
+    color = Vector::Add(color, specularColor);
+    color = {
+        std::min(1.0, std::max(0.0, color.x)),
+        std::min(1.0, std::max(0.0, color.y)),
+        std::min(1.0, std::max(0.0, color.z))
+    };
+
+    return color;
+}
+
+
+std::pair<Vector::TVector3, Vector::TVector3> GetReflectedRay(const Vector::TVector3 &pos, const Vector::TVector3 &dir, const TPolygon &polygon, const Vector::TVector3 &hitPosition) {
     Vector::TVector3 n = GetPolygonNormal(polygon);
 
-    Vector::TVector3 hitPosition = Vector::Add(pos, Vector::Mult(t, dir));
     Vector::TVector3 nextDir = Reflect(dir, n);
     Vector::TVector3 nextPos = Vector::Add(hitPosition, Vector::Mult(EPS, nextDir));
 
@@ -229,9 +244,9 @@ Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vect
 
     TPolygon hitPolygon = polygons[k_min];
     Vector::TVector3 hitPosition = Vector::Add(pos, Vector::Mult(ts_min, dir));
-    Vector::TVector3 hitColor = GetColor(0.6, hitPolygon, hitPosition);
+    Vector::TVector3 hitColor = GetColor(0.6, hitPolygon, hitPosition, dir);
 
-    std::pair<Vector::TVector3, Vector::TVector3> nextRay = GetReflectedRay(pos, dir, hitPolygon, ts_min);
+    std::pair<Vector::TVector3, Vector::TVector3> nextRay = GetReflectedRay(pos, dir, hitPolygon, hitPosition);
     Vector::TVector3 reflectedColor = ray(nextRay.first, nextRay.second, polygons, depth + 1);
 
     Vector::TVector3 refractedDir = dir;
