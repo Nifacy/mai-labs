@@ -129,17 +129,40 @@ void build_space(std::vector<TPolygon> &out) {
 }
 
 
-Vector::TVector3 GetColor(double embientLight, const TPolygon &polygon) {
-    Vector::TVector3 color = { 0.0, 0.0, 0.0 };
-    color = Vector::Add(color, Vector::Mult(embientLight, polygon.color));
-    return color;
-}
+Vector::TVector3 lightPos = { 0.0, 6.0, 6.0 };
+Vector::TVector3 lightColor = { 1.0, 1.0, 1.0 };
 
 
 Vector::TVector3 GetPolygonNormal(const TPolygon &polygon) {
     Vector::TVector3 v1 = Vector::Sub(polygon.verticles[1], polygon.verticles[0]);
     Vector::TVector3 v2 = Vector::Sub(polygon.verticles[2], polygon.verticles[0]);
     return Vector::Normalize(Vector::Prod(v1, v2));
+}
+
+
+Vector::TVector3 GetColor(double embientLight, const TPolygon &polygon, const Vector::TVector3 &hitPos) {
+    // embient color
+    Vector::TVector3 embientColor = Vector::Mult(embientLight, polygon.color);
+
+    // diffuse color
+    double k_d = 1.0;
+    Vector::TVector3 l = Vector::Normalize(Vector::Sub(lightPos, hitPos));
+    Vector::TVector3 n = GetPolygonNormal(polygon);
+    double cosPhi = std::abs(Vector::Dot(n, l));
+    Vector::TVector3 v = Vector::Mult(polygon.color, lightColor);
+    Vector::TVector3 diffuseColor = Vector::Mult(k_d * cosPhi, v);
+
+    // total color
+    Vector::TVector3 color = { 0.0, 0.0, 0.0 };
+    color = Vector::Add(color, embientColor);
+    color = Vector::Add(color, diffuseColor);
+    color = {
+        std::min(1.0, std::max(0.0, color.x)),
+        std::min(1.0, std::max(0.0, color.y)),
+        std::min(1.0, std::max(0.0, color.z))
+    };
+
+    return color;
 }
 
 
@@ -205,13 +228,13 @@ Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vect
 	}
 
     TPolygon hitPolygon = polygons[k_min];
-    Vector::TVector3 hitColor = GetColor(0.6, hitPolygon);
+    Vector::TVector3 hitPosition = Vector::Add(pos, Vector::Mult(ts_min, dir));
+    Vector::TVector3 hitColor = GetColor(0.6, hitPolygon, hitPosition);
 
     std::pair<Vector::TVector3, Vector::TVector3> nextRay = GetReflectedRay(pos, dir, hitPolygon, ts_min);
     Vector::TVector3 reflectedColor = ray(nextRay.first, nextRay.second, polygons, depth + 1);
 
     Vector::TVector3 refractedDir = dir;
-    Vector::TVector3 hitPosition = Vector::Add(pos, Vector::Mult(ts_min, dir));
     Vector::TVector3 refractedPos = Vector::Add(hitPosition, Vector::Mult(EPS, refractedDir));
     Vector::TVector3 refractedColor = ray(refractedPos, refractedDir, polygons, depth + 1);
 
@@ -273,18 +296,21 @@ int main() {
 
     build_space(polygons);
 
-    for(unsigned int k = 0; k < 30; k += 1) { 
-        cameraPos = (Vector::TVector3) {
-			6.0 * sin(0.05 * k),
-			6.0 * cos(0.05 * k),
-			5.0 + 2.0 * sin(0.1 * k)
-		}; // in scalar coords
+    for(unsigned int k = 0; k < 1; k += 1) { 
+        cameraPos = { -6.0, 0.0, 7.0 };
+        pv = { 1.0, 0.0, -1.0 };
 
-        pv = (Vector::TVector3) {
-			3.0 * sin(0.05 * k + M_PI),
-			3.0 * cos(0.05 * k + M_PI),
-			0.0
-		};
+        // cameraPos = (Vector::TVector3) {
+		// 	6.0 * sin(0.05 * k),
+		// 	6.0 * cos(0.05 * k),
+		// 	7.0 + 2.0 * sin(0.1 * k)
+		// }; // in scalar coords
+
+        // pv = (Vector::TVector3) {
+		// 	3.0 * sin(0.05 * k + M_PI),
+		// 	3.0 * cos(0.05 * k + M_PI),
+		// 	-1.0
+		// };
 
         render(cameraPos, pv, 120.0, &canvas, polygons);
     
