@@ -1,8 +1,11 @@
+#include <iostream>
+#include <string>
+
 #include "utils.cuh"
 #include "canvas.cuh"
 
 
-__global__ void Draw(Canvas::TCanvas canvas) {
+__global__ void GpuDraw(Canvas::TCanvas canvas) {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
     int idy = blockDim.y * blockIdx.y + threadIdx.y;
     int offsetx = blockDim.x * gridDim.x;
@@ -16,16 +19,33 @@ __global__ void Draw(Canvas::TCanvas canvas) {
 }
 
 
-int main() {
+void CpuDraw(Canvas::TCanvas canvas) {
+    for (unsigned int x = 0; x < canvas.width; ++x) {
+        for (unsigned int y = 0; y < canvas.height; ++y) {
+            Canvas::PutPixel(&canvas, Canvas::TPosition { x, y }, Canvas::TColor { 255, 0, 0, 255 });
+        }
+    }
+}
+
+
+int main(int argc, char *argv[]) {
+    std::string deviceType = std::string(argv[1]);    
     Canvas::TCanvas canvas;
 
-    Canvas::Init(&canvas, 200, 200, Canvas::DeviceType::GPU);
+    Canvas::Init(&canvas, 200, 200, (deviceType == "gpu") ? Canvas::DeviceType::GPU : Canvas::DeviceType::CPU);
 
-    Draw<<<100, 100>>>(canvas);
-
-    cudaDeviceSynchronize();
-    SAVE_CUDA(cudaGetLastError());
+    if (deviceType == "gpu") {
+        std::cerr << "[log] using GPU render ..." << std::endl;
+        GpuDraw<<<100, 100>>>(canvas);
+        cudaDeviceSynchronize();
+        SAVE_CUDA(cudaGetLastError());    
+    } else {
+        std::cerr << "[log] using CPU render ..." << std::endl;
+        CpuDraw(canvas);
+    }
 
     Canvas::Dump(&canvas, "build/0.data");
     Canvas::Destroy(&canvas);
+
+    return 0;
 }
