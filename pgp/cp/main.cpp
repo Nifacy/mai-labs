@@ -496,18 +496,18 @@ void build_space(std::vector<TPolygon> &out) {
     TModelConfig cubeConfig =         {
             .pos = { 0.0, 0.0, 0.5 + 2.0 * EPS },
             .color = { 0.2, 1.0, 0.2 },
-            .scale = 0.3,
+            .scale = 3.0,
             .reflection = 1.0,
             .transparent = 1.0,
             .blend = 1.0
         };
 
-    // BuildLampLine(
-    //     cubeConfig,
-    //     cubeMesh,
-    //     2,
-    //     out
-    // );
+    BuildLampLine(
+        cubeConfig,
+        cubeMesh,
+        2,
+        out
+    );
 
     // buildCube(
     //     {
@@ -521,22 +521,22 @@ void build_space(std::vector<TPolygon> &out) {
     //     out
     // );
 
-    // BuildModel(
-    //     cubeConfig,
-    //     cubeMesh,
-    //     out
-    // );
-
-    std::vector<TFace> mesh = LoadMesh("objects/model2.obj");
-
-    BuildLampLine(
+    BuildModel(
         cubeConfig,
-        mesh,
-        2,
+        cubeMesh,
         out
     );
 
-    BuildModel(cubeConfig, mesh, out);
+    // std::vector<TFace> mesh = LoadMesh("objects/model2.obj");
+
+    // BuildLampLine(
+    //     cubeConfig,
+    //     mesh,
+    //     2,
+    //     out
+    // );
+
+    // BuildModel(cubeConfig, mesh, out);
 }
 
 
@@ -695,8 +695,22 @@ std::pair<Vector::TVector3, Vector::TVector3> GetReflectedRay(const Vector::TVec
     return { nextPos, nextDir };
 }
 
-Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vector<TPolygon> &polygons, const std::vector<TLight> &lights, int depth) { 
-    if (depth > 3) {
+struct TRay {
+    Vector::TVector3 pos;
+    Vector::TVector3 dir;
+    Vector::TVector3 color;
+    std::pair<unsigned int, unsigned int> pixelPos;
+    int depth;
+};
+
+
+Vector::TVector3 ray(
+    TRay ray,
+    const std::vector<TPolygon> &polygons,
+    const std::vector<TLight> &lights,
+    std::vector<TRay> &nextRays
+) { 
+    if (ray.depth > 3) {
         return { 0.0, 0.0, 0.0 };
     }
 
@@ -704,7 +718,7 @@ Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vect
     double ts_min;
 
     for(unsigned int k = 0; k < polygons.size(); k++) {
-        THit hit = CheckHitWithPolygon(pos, dir, polygons[k]);
+        THit hit = CheckHitWithPolygon(ray.pos, ray.dir, polygons[k]);
         double t = hit.t;
 
         if (!hit.exists) {
@@ -721,28 +735,46 @@ Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vect
         return { 0.0, 0.0, 0.0 };
 	}
 
-    Vector::TVector3 resultColor = { 1.0, 1.0, 1.0 };
 
     TPolygon hitPolygon = polygons[k_min];
-    Vector::TVector3 hitPosition = Vector::Add(pos, Vector::Mult(ts_min, dir));
-    Vector::TVector3 hitColor = GetColor(hitPosition, dir, k_min, polygons, lights);
+    Vector::TVector3 hitPosition = Vector::Add(ray.pos, Vector::Mult(ts_min, ray.dir));
+    Vector::TVector3 hitColor = GetColor(hitPosition, ray.dir, k_min, polygons, lights);
+    Vector::TVector3 resultColor = Vector::Mult(ray.color, hitColor);
 
     if (hitPolygon.reflection > 0.0) {
-        std::pair<Vector::TVector3, Vector::TVector3> nextRay = GetReflectedRay(pos, dir, hitPolygon, hitPosition);
-        Vector::TVector3 reflectedColor = ray(nextRay.first, nextRay.second, polygons, lights, depth + 1);
+        std::pair<Vector::TVector3, Vector::TVector3> nextRay = GetReflectedRay(ray.pos, ray.dir, hitPolygon, hitPosition);
+        // Vector::TVector3 reflectedColor = ray(nextRay.first, nextRay.second, polygons, lights, depth + 1);
 
-        resultColor = Vector::Add(resultColor, Vector::Mult(hitPolygon.reflection, reflectedColor));
+        TRay r2 = {
+            .pos = nextRay.first,
+            .dir = nextRay.second,
+            .color = Vector::Mult(hitPolygon.reflection, hitColor),
+            .pixelPos = ray.pixelPos,
+            .depth = ray.depth + 1
+        };
+        nextRays.push_back(r2);
+
+        // resultColor = Vector::Add(resultColor, Vector::Mult(hitColor, Vector::Mult(hitPolygon.reflection, reflectedColor)));
     }
 
     if (hitPolygon.transparent > 0.0) {
-        Vector::TVector3 refractedDir = dir;
+        Vector::TVector3 refractedDir = ray.dir;
         Vector::TVector3 refractedPos = Vector::Add(hitPosition, Vector::Mult(EPS, refractedDir));
-        Vector::TVector3 refractedColor = ray(refractedPos, refractedDir, polygons, lights, depth + 1);
+        // Vector::TVector3 refractedColor = ray(refractedPos, refractedDir, polygons, lights, depth + 1);
 
-        resultColor = Vector::Add(resultColor, Vector::Mult(hitPolygon.transparent, refractedColor));
+        TRay r2 = {
+            .pos = refractedPos,
+            .dir = refractedDir,
+            .color = Vector::Mult(hitPolygon.transparent, hitColor),
+            .pixelPos = ray.pixelPos,
+            .depth = ray.depth + 1
+        };
+        nextRays.push_back(r2);
+
+        // resultColor = Vector::Add(resultColor, Vector::Mult(hitColor, Vector::Mult(hitPolygon.transparent, refractedColor)));
     }
 
-    return Vector::Mult(hitColor, resultColor);
+    return resultColor;
 }
 
 
@@ -771,16 +803,61 @@ void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCan
     Vector::TVector3 bx = Vector::Normalize(Vector::Prod(bz, {0.0, 0.0, 1.0}));
     Vector::TVector3 by = Vector::Normalize(Vector::Prod(bx, bz));
 
+    std::vector<TRay> rays1, rays2;
+
+    // initialize rays
     for(unsigned int i = 0; i < canvas->width; i++) {
         for(unsigned int j = 0; j < canvas->height; j++) {
             Vector::TVector3 v = {-1.0 + dw * i, (-1.0 + dh * j) * canvas->height / canvas->width, z};
             Vector::TVector3 dir = Vector::Mult(bx, by, bz, v);
-			Vector::TVector3 colorVector = ray(pc, Vector::Normalize(dir), polygons, lights, 0);
-            Canvas::TColor color = VectorToColor(colorVector);
 
-            Canvas::PutPixel(canvas, { i, canvas->height - 1 - j }, color);
+            TRay ray = {
+                .pos = pc,
+                .dir = Vector::Normalize(dir),
+                .color = { 1.0, 1.0, 1.0 },
+                .pixelPos = { i, canvas->height - 1 - j },
+                .depth = 0
+            };
+
+            rays1.push_back(ray);
+            Canvas::PutPixel(canvas, { i, canvas->height - 1 - j }, { 0, 0, 0 });
 		}
 	}
+
+    for (int i = 0;; i = (i + 1) % 2) {
+        std::vector<TRay> &first = (i % 2 == 0) ? rays1 : rays2;
+        std::vector<TRay> &second = (i % 2 == 0) ? rays2 : rays1;
+
+        if (first.size() == 0) {
+            break;
+        }
+
+        for (TRay &el : first) {
+            Canvas::TColor color = VectorToColor(ray(el, polygons, lights, second));
+            Canvas::TColor canvasColor = Canvas::GetPixel(canvas, el.pixelPos);
+            Canvas::TColor resultColor = {
+                .r = (unsigned char) std::min(255, int(color.r) + int(canvasColor.r)),
+                .g = (unsigned char) std::min(255, int(color.g) + int(canvasColor.g)),
+                .b = (unsigned char) std::min(255, int(color.b) + int(canvasColor.b)),
+                .a = (unsigned char) std::min(255, int(color.a) + int(canvasColor.a))
+            };
+
+            Canvas::PutPixel(canvas, el.pixelPos, resultColor);
+        }
+
+        first.clear();
+    }
+
+    // for(unsigned int i = 0; i < canvas->width; i++) {
+    //     for(unsigned int j = 0; j < canvas->height; j++) {
+    //         Vector::TVector3 v = {-1.0 + dw * i, (-1.0 + dh * j) * canvas->height / canvas->width, z};
+    //         Vector::TVector3 dir = Vector::Mult(bx, by, bz, v);
+	// 		Vector::TVector3 colorVector = ray(pc, Vector::Normalize(dir), polygons, lights, 0);
+    //         Canvas::TColor color = VectorToColor(colorVector);
+
+    //         Canvas::PutPixel(canvas, { i, canvas->height - 1 - j }, color);
+	// 	}
+	// }
 }
 
 

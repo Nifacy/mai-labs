@@ -27,6 +27,7 @@ namespace Canvas {
 
     void Dump(const TCanvas *canvas, const std::string &filename);
     void PutPixel(TCanvas *canvas, const std::tuple<unsigned int, unsigned int> &pos, const TColor &color);
+    TColor GetPixel(TCanvas *canvas, const std::tuple<unsigned int, unsigned int> &pos);
 }
 
 #endif  // _CANVAS_H_

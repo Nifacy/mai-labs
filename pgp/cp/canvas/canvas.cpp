@@ -41,4 +41,10 @@ namespace Canvas {
         canvas->data[y * canvas->width + x] = color;
     }
 
+    TColor GetPixel(TCanvas *canvas, const std::tuple<unsigned int, unsigned int> &pos) {
+        unsigned int x = std::get<0>(pos);
+        unsigned int y = std::get<1>(pos);
+        return canvas->data[y * canvas->width + x];
+    }
+
 }
