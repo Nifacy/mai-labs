@@ -58,4 +58,4 @@ def parse_args() -> argparse.Namespace:
 #         print(f"[log] image {output_file} created")
 
 # read_data_file(pathlib.Path("textures/simple.data")).show()
-# save_in_data_format(Image.open("textures/simple.png"), pathlib.Path("textures/simple.data"))
+save_in_data_format(Image.open("textures/floor.jpg"), pathlib.Path("textures/floor.data"))

@@ -16,6 +16,7 @@ namespace Vector {
 	TVector3 Sub(TVector3 a, TVector3 b);
 	TVector3 Add(TVector3 a, TVector3 b);
 	TVector3 Mult(TVector3 a, TVector3 b, TVector3 c, TVector3 v);
+	TVector3 Mult(TVector3 a, TVector3 b);
     TVector3 Mult(double coef, TVector3 v);
 }
 

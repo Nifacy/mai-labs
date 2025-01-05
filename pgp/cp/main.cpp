@@ -6,6 +6,8 @@
 #include <vector>
 #include <iostream>
 #include <cstring>
+#include <fstream>
+#include <sstream>
 
 #include "canvas/canvas.h"
 #include "vector/vector.h"
@@ -110,7 +112,9 @@ struct TPolygon {
     Vector::TVector3 color;
     double reflection = 0.0;
     double transparent = 0.0;
+    double blend = 0.0;
     const TextureProjection::TTextureProjection *texture = nullptr;
+    bool isLightSource = false;
 };
 
 
@@ -120,11 +124,49 @@ struct TCubeConfig {
     double size;
     double reflection = 0.0;
     double transparent = 0.0;
+    double blend = 0.0;
     const Texture::TTexture *texture = nullptr;
 };
 
 
 const double EPS = 1e-3;
+
+
+
+struct TFace {
+    Vector::TVector3 vertices[3];
+};
+
+
+std::vector<TFace> LoadCubeMesh() {
+    std::vector<Vector::TVector3> vertices = {
+        {-1.0, -1.0, 1.0},
+        {1.0, -1.0, 1.0},
+        {-1.0, 1.0, 1.0},
+        {1.0, 1.0, 1.0},
+        {1.0, -1.0, -1.0},
+        {1.0, 1.0, -1.0},
+        {-1.0, 1.0, -1.0},
+        {-1.0, -1.0, -1.0}
+    };
+
+    std::vector<std::vector<int>> faces = {
+        {0, 1, 2}, {1, 3, 2}, // top
+        {4, 5, 3}, {1, 4, 3},
+        {6, 7, 2}, {7, 0, 2},
+        {4, 7, 6}, {5, 4, 6},
+        {0, 7, 1}, {7, 4, 1},
+        {6, 2, 3}, {5, 6, 3}
+    };
+
+    std::vector<TFace> out;
+
+    for (const std::vector<int> &verticeIds : faces) {
+        out.push_back({ .vertices = { vertices[verticeIds[0]], vertices[verticeIds[1]], vertices[verticeIds[2]] } });
+    }
+
+    return out;
+}
 
 
 void buildCube(
@@ -157,6 +199,7 @@ void buildCube(
         .color = config.color,
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[0]
     });
 
@@ -165,6 +208,7 @@ void buildCube(
         .color = config.color,
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[1]
     });
 
@@ -174,23 +218,26 @@ void buildCube(
         .color = config.color,
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[0]
     });
 
     out.push_back({
-        .verticles = {{x + c, y - c, z - c}, {x + c, y - c, z + c}, {x + c, y + c, z + c}},
+        .verticles = {{x + c, y - c, z + c}, {x + c, y - c, z - c}, {x + c, y + c, z + c}},
         .color = config.color,
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[1]
     });
 
     // left
     out.push_back({
-        .verticles = {{x - c, y - c, z - c}, {x - c, y + c, z - c}, {x - c, y + c, z + c}},
+        .verticles = {{x - c, y + c, z - c}, {x - c, y - c, z - c}, {x - c, y + c, z + c}},
         .color = config.color,
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[0]
     });
 
@@ -199,32 +246,36 @@ void buildCube(
         .color = config.color,
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[1]
     });
 
     // bottom
     out.push_back({
-        .verticles = {{x - c, y - c, z - c}, {x + c, y - c, z - c}, {x - c, y + c, z - c}},
-        .color = config.color,
+        .verticles = {{x + c, y - c, z - c}, {x - c, y - c, z - c}, {x - c, y + c, z - c}},
+        .color = {1, 1, 1},
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[0]
     });
 
     out.push_back({
         .verticles = {{x + c, y + c, z - c}, {x + c, y - c, z - c}, {x - c, y + c, z - c}},
-        .color = config.color,
+        .color = {1, 1, 1},
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[1]
     });
 
     // back
     out.push_back({
-        .verticles = {{x - c, y - c, z - c}, {x - c, y - c, z + c}, {x + c, y - c, z + c}},
+        .verticles = {{x - c, y - c, z + c}, {x - c, y - c, z - c}, {x + c, y - c, z + c}},
         .color = config.color,
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[0]
     });
 
@@ -233,6 +284,7 @@ void buildCube(
         .color = config.color,
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[1]
     });
 
@@ -242,89 +294,91 @@ void buildCube(
         .color = config.color,
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[0]
     });
 
     out.push_back({
-        .verticles = {{x - c, y + c, z - c}, {x + c, y + c, z - c}, {x + c, y + c, z + c}},
+        .verticles = {{x + c, y + c, z - c}, {x - c, y + c, z - c}, {x + c, y + c, z + c}},
         .color = config.color,
         .reflection = config.reflection,
         .transparent= config.transparent,
+        .blend = config.blend,
         .texture = projs[1]
     });
 }
 
 
-void build_space(std::vector<TPolygon> &out, const Texture::TTexture *texture) {
-    // buildCube({ 0.0, -3.0, 3.0 }, { 1.0, 0.0, 0.0 }, 2.0, 0.0, 0.0, out);
-    TextureProjection::TTextureProjection *proj = nullptr;
-    TextureProjection::TTextureProjection *proj2 = nullptr;
-    
-    if (texture != nullptr) {
-        proj = new TextureProjection::TTextureProjection {
-            .src = *texture,
-            .verticles = { { 1.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 1.0, 0.0 } }
-        };
-
-        proj2 = new TextureProjection::TTextureProjection {
-            .src = *texture,
-            .verticles = { { 1.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 0.0, 0.0, 0.0 } }
-        };
+std::vector<TFace> LoadMesh(const std::string &filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Unable to open file: " + filepath);
     }
 
-    out.push_back({
-        .verticles = { { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 3.0 }, { 3.0, 0.0, 3.0 } },
-        .color = { 1.0, 0.0, 0.0 },
-        .texture = proj
-    });
+    std::vector<Vector::TVector3> vertices;
+    std::vector<TFace> faces;
 
-    out.push_back({
-        .verticles = { { 0.0, 0.0, 0.0 }, { 3.0, 0.0, 0.0 }, { 3.0, 0.0, 3.0 } },
-        .color = { 1.0, 0.0, 0.0 },
-        .texture = proj2
-    });
+    std::string line;
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
 
-    // buildCube(
-    //     {
-    //         .pos = { 0.0, -5.0, 3.0 },
-    //         .color = { 0.6, 0.6, 0.6 },
-    //         .size = 2.0,
-    //         .reflection = 1.0,
-    //         .transparent = 0.0
-    //     },
-    //     out
-    // );
+        char type;
+        iss >> type;
 
-    // buildCube(
-    //     {
-    //         .pos = { 0.0, 5.0, 3.0 },
-    //         .color = { 0.0, 1.0, 0.0 },
-    //         .size = 2.0,
-    //         .reflection = 0.0,
-    //         .transparent = 0.0,
-    //         .texture = texture
-    //     },
-    //     out
-    // );
+        if (type == 'v') {
+            double x, y, z;
+            iss >> x >> y >> z;
+            vertices.push_back({x, y, z});
+        } else if (type == 'f') {
+            int v1, v2, v3;
+            iss >> v1 >> v2 >> v3;
 
-    // buildCube({ 0.0, 5.0, 0.0 }, { 0.0, 1.0, 0.0 }, 2.0, 0.5, 0.0, out);
-    // buildCube(
-    //     {
-    //         .pos = { 0.0, 0.0, -8.0 },
-    //         .color = { 1.0, 1.0, 1.0 },
-    //         .size = 8.0,
-    //         .reflection = 0.0,
-    //         .transparent = 0.0,
-    //         .texture = texture
-    //     },
-    //     out
-    // );
+            if (v1 <= 0 || v2 <= 0 || v3 <= 0 ||  v1 > vertices.size() || v2 > vertices.size() || v3 > vertices.size()) {
+                throw std::runtime_error("Invalid face indices in file: " + filepath);
+            }
+
+            faces.push_back({.vertices = { vertices[v1 - 1], vertices[v2 - 1], vertices[v3 - 1] }});
+        } else if (type == '#') {
+            continue;
+        }
+    }
+
+    std::cerr << "[log] read " << vertices.size() << " vertices\n";
+
+    file.close();
+    return faces;
 }
 
 
-const double EMBIENT_COEF = 0.2;
-const double SPECULAR_COEF = 1.0;
-const double DIFFUSE_COEF = 0.4;
+struct TModelConfig {
+    Vector::TVector3 pos = { 0.0, 0.0, 0.0 };
+    Vector::TVector3 color = { 1.0, 1.0, 1.0 };
+    double scale = 1.0;
+    double reflection = 0.0;
+    double transparent = 0.0;
+    double blend = 0.0;
+    bool isLightSource = false;
+};
+
+
+void BuildModel(const TModelConfig &config, const std::vector<TFace> &mesh, std::vector<TPolygon> &out) {
+    for (const TFace &face : mesh) {
+        std::vector<Vector::TVector3> v;
+
+        for (int i = 0; i < 3; ++i) {
+            v.push_back(Vector::Add(config.pos, Vector::Mult(config.scale, face.vertices[i])));
+        }
+
+        out.push_back({
+            .verticles = { v[0], v[1], v[2] },
+            .color = config.color,
+            .reflection = config.reflection,
+            .transparent = config.transparent,
+            .blend = config.blend,
+            .isLightSource = config.isLightSource
+        });
+    }
+}
 
 
 Vector::TVector3 GetPolygonNormal(const TPolygon &polygon) {
@@ -332,6 +386,163 @@ Vector::TVector3 GetPolygonNormal(const TPolygon &polygon) {
     Vector::TVector3 v2 = Vector::Sub(polygon.verticles[2], polygon.verticles[0]);
     return Vector::Normalize(Vector::Prod(v1, v2));
 }
+// { .verticles = { cubeMesh[0].vertices[0], cubeMesh[0].vertices[1], cubeMesh[0].vertices[2] } },
+//         { .verticles = { cubeMesh[5].vertices[0], cubeMesh[5].vertices[1], cubeMesh[5].vertices[2] } },
+
+void BuildLampLine(const TModelConfig &modelConfig, const std::vector<TFace> &mesh, int n, std::vector<TPolygon> &out) {
+    for (int t1 = 0; t1 < mesh.size(); ++t1) {
+        for (int t2 = t1 + 1; t2 < mesh.size(); ++t2) {
+            TPolygon a = { .verticles = { mesh[t1].vertices[0], mesh[t1].vertices[1], mesh[t1].vertices[2] } };
+            TPolygon b = { .verticles = { mesh[t2].vertices[0], mesh[t2].vertices[1], mesh[t2].vertices[2] } };
+
+            std::vector<Vector::TVector3> points;
+            for (int i = 0; i < 3; ++i) {
+                for (int j = 0; j < 3; ++j) {
+                    if (a.verticles[i].x == b.verticles[j].x && a.verticles[i].y == b.verticles[j].y && a.verticles[i].z == b.verticles[j].z) {
+                        points.push_back(a.verticles[i]);
+                    }
+                }
+            }
+
+            if (points.size() < 2) {
+                continue;
+            }
+
+            Vector::TVector3 na = Vector::Mult(-1.0, GetPolygonNormal(a));
+            Vector::TVector3 nb = Vector::Mult(-1.0, GetPolygonNormal(b));
+
+            if (std::abs(na.x - nb.x) < 0.001 && std::abs(na.y - nb.y) < 0.001 && std::abs(na.z - nb.z) < 0.001) {
+                continue;
+            }
+
+            Vector::TVector3 v = Vector::Sub(points.at(1), points.at(0));
+            Vector::TVector3 d = Vector::Normalize(Vector::Add(na, nb));
+            Vector::TVector3 s = Vector::Normalize(Vector::Prod(d, v));
+
+            Vector::TVector3 diff1 = Vector::Mult(0.1, Vector::Normalize(Vector::Add(d, s)));
+            Vector::TVector3 diff2 = Vector::Mult(0.1, Vector::Normalize(Vector::Sub(d, s)));
+
+            std::vector<Vector::TVector3> vertices = {
+                Vector::Add(points[0], diff1),
+                Vector::Add(points[0], diff2),
+                Vector::Add(points[1], diff1),
+                Vector::Add(points[1], diff2)
+            };
+
+            std::vector<TFace> faces = {
+                { { vertices[0], vertices[1], vertices[2] } },
+                { { vertices[3], vertices[2], vertices[1] } }
+            };
+
+            BuildModel({ .pos = modelConfig.pos, .color = { 0.1, 0.1, 0.1 }, .scale = modelConfig.scale, .isLightSource = true }, faces, out);
+
+            Vector::TVector3 e1 = Vector::Mult(0.05, Vector::Normalize(v));
+            Vector::TVector3 e2 = Vector::Mult(0.05, Vector::Normalize(s));
+            Vector::TVector3 e3 = Vector::Mult(0.1, Vector::Normalize(d));
+
+            for(int k = 0; k < n; k++) {
+                double t = 1.0 / (n + 1) * (k + 1);
+                Vector::TVector3 lampPos = Vector::Add(points[0], Vector::Mult(t, v));
+
+                std::vector<Vector::TVector3> lampVertices = {
+                    Vector::Add(Vector::Add(e2, Vector::Add(e1, e3)), lampPos),
+                    Vector::Add(Vector::Sub(Vector::Add(e1, e3), e2), lampPos),
+                    Vector::Add(Vector::Add(e2, Vector::Sub(e3, e1)), lampPos),
+                    Vector::Add(Vector::Sub(Vector::Sub(e3, e1), e2), lampPos)
+                };
+
+                std::vector<TFace> lampFaces = {
+                    { { lampVertices[1], lampVertices[0], lampVertices[2] } },
+                    { { lampVertices[2], lampVertices[3], lampVertices[1] } }
+                };
+
+                BuildModel({ .pos = modelConfig.pos, .color = { 1.0, 1.0, 1.0 }, .scale = modelConfig.scale, .transparent = 1.0, .isLightSource = true }, lampFaces, out);
+            }
+
+        }
+    }
+}
+
+
+void build_space(std::vector<TPolygon> &out) {
+    // floor
+    // Texture::TTexture *floorTexture = new Texture::TTexture {};
+    // Texture::Load("textures/floor.data", *floorTexture);
+
+    // TextureProjection::TTextureProjection *floorProj1 = new TextureProjection::TTextureProjection {
+    //     .src = *floorTexture,
+    //     .verticles = { { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 } }
+    // };
+
+    // TextureProjection::TTextureProjection *floorProj2 = new TextureProjection::TTextureProjection {
+    //     .src = *floorTexture,
+    //     .verticles = { { 1.0, 1.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 } }
+    // };
+
+    // out.push_back({
+    //     .verticles = { { -5.0, -5.0, 0.0 }, { 5.0, -5.0, 0.0 }, { -5.0, 5.0, 0.0 } },
+    //     .color = { 1.0, 1.0, 1.0 },
+    //     .texture = floorProj1
+    // });
+
+    // out.push_back({
+    //     .verticles = { { -5.0, 5.0, 0.0 }, { 5.0, -5.0, 0.0 }, { 5.0, 5.0, 0.0 } },
+    //     .color = { 1.0, 1.0, 1.0 },
+    //     .texture = floorProj2
+    // });
+
+    // cube
+    std::vector<TFace> cubeMesh = LoadCubeMesh();
+    TModelConfig cubeConfig =         {
+            .pos = { 0.0, 0.0, 0.5 + 2.0 * EPS },
+            .color = { 0.2, 1.0, 0.2 },
+            .scale = 0.3,
+            .reflection = 1.0,
+            .transparent = 1.0,
+            .blend = 1.0
+        };
+
+    // BuildLampLine(
+    //     cubeConfig,
+    //     cubeMesh,
+    //     2,
+    //     out
+    // );
+
+    // buildCube(
+    //     {
+    //         .pos = { 0.0, 0.0, 1.0 + 2.0 * EPS },
+    //         .color = { 1.0, 0.5, 0.5 },
+    //         .size = 1.0,
+    //         .reflection = 1.0,
+    //         .transparent = 0.0,
+    //         .blend = 0.0
+    //     },
+    //     out
+    // );
+
+    // BuildModel(
+    //     cubeConfig,
+    //     cubeMesh,
+    //     out
+    // );
+
+    std::vector<TFace> mesh = LoadMesh("objects/model2.obj");
+
+    BuildLampLine(
+        cubeConfig,
+        mesh,
+        2,
+        out
+    );
+
+    BuildModel(cubeConfig, mesh, out);
+}
+
+
+const double EMBIENT_COEF = 0.1;
+const double SPECULAR_COEF = 0.5;
+const double DIFFUSE_COEF = 1.0;
 
 
 Vector::TVector3 Reflect(const Vector::TVector3 &v, const Vector::TVector3 &normal) {
@@ -408,15 +619,22 @@ Vector::TVector3 GetColor(
     const std::vector<TLight> &lights
 ) {
     Vector::TVector3 totalColor = { 0.0, 0.0, 0.0 };
+    const TPolygon &polygon = polygons[polygonId];
+
+    if (polygon.isLightSource) {
+        return polygon.color;
+    }
+
+    // embient light
+    Vector::TVector3 embientColor = Vector::Mult(EMBIENT_COEF, polygon.color);
 
     for (const TLight &light : lights) {
         Vector::TVector3 lightPos = light.position;
         Vector::TVector3 lightColor = light.color;
 
-        const TPolygon &polygon = polygons[polygonId];
         Vector::TVector3 lightDir = Vector::Normalize(Vector::Sub(hitPos, lightPos));
         Vector::TVector3 dirNormalized = Vector::Normalize(dir);
-        Vector::TVector3 resultColor = Vector::Mult(GetPolygonPixelColor(polygon, hitPos), lightColor);
+        Vector::TVector3 resultColor = lightColor;
 
         // shade coef
         double shadeCoef = 1.0;
@@ -430,18 +648,15 @@ Vector::TVector3 GetColor(
             if (i == polygonId) continue;
             THit hit = CheckHitWithPolygon(lightPos, lightDir, polygons[i]);
 
-            if (hit.exists && hit.t < currHit.t) {
+            if ((!polygons[i].isLightSource) && hit.exists && (hit.t < currHit.t)) {
                 shadeCoef *= polygons[i].transparent;
             }
         }
 
-        // embient light
-        Vector::TVector3 embientColor = Vector::Mult(EMBIENT_COEF, polygon.color);
-
         // diffuse light
         Vector::TVector3 l = Vector::Mult(-1.0, lightDir);
         Vector::TVector3 n = GetPolygonNormal(polygon);
-        double diffuseAngle = std::abs(Vector::Dot(n, l));
+        double diffuseAngle = std::max(0.0, Vector::Dot(n, l));
         double diffuseCoef = DIFFUSE_COEF * diffuseAngle;
 
         // specular light
@@ -449,15 +664,17 @@ Vector::TVector3 GetColor(
             Vector::Sub(hitPos, lightPos),
             GetPolygonNormal(polygon)
         ));
-        double specularAngle = std::abs(Vector::Dot(reflectedLightDirection, dirNormalized));
-        double specularCoef = SPECULAR_COEF * std::pow(specularAngle, 9);
+        double specularAngle = std::max(0.0, Vector::Dot(reflectedLightDirection, dirNormalized));
+        if (specularAngle >= 1.0) std::cout << specularAngle << std::endl;
+        double specularCoef = polygon.blend * SPECULAR_COEF * std::pow(specularAngle, 9);
 
         // total color
-        Vector::TVector3 color = { 0.0, 0.0, 0.0 };
-        color = Vector::Add(color, Vector::Mult(shadeCoef * (diffuseCoef + specularCoef), resultColor));
-        color = Vector::Add(color, embientColor);
+        Vector::TVector3 color = Vector::Mult(shadeCoef * (diffuseCoef + specularCoef), resultColor);
         totalColor = Vector::Add(totalColor, color);
     }
+
+    totalColor = Vector::Add(totalColor, embientColor);
+    totalColor = Vector::Mult(totalColor, GetPolygonPixelColor(polygon, hitPos));
 
     totalColor = {
         std::min(1.0, std::max(0.0, totalColor.x)),
@@ -479,7 +696,7 @@ std::pair<Vector::TVector3, Vector::TVector3> GetReflectedRay(const Vector::TVec
 }
 
 Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vector<TPolygon> &polygons, const std::vector<TLight> &lights, int depth) { 
-    if (depth > 2) {
+    if (depth > 3) {
         return { 0.0, 0.0, 0.0 };
     }
 
@@ -525,7 +742,7 @@ Vector::TVector3 ray(Vector::TVector3 pos, Vector::TVector3 dir, const std::vect
         resultColor = Vector::Add(resultColor, Vector::Mult(hitPolygon.transparent, refractedColor));
     }
 
-    return { hitColor.x * resultColor.x, hitColor.y * resultColor.y, hitColor.z * resultColor.z };
+    return Vector::Mult(hitColor, resultColor);
 }
 
 
@@ -567,6 +784,139 @@ void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCan
 }
 
 
+/*  Debug Render */
+
+struct TPoint {
+    int x, y;
+};
+
+void DrawLine(Canvas::TCanvas *canvas, TPoint p1, TPoint p2, Canvas::TColor color) {
+    int x1 = p1.x;
+    int y1 = p1.y;
+    int x2 = p2.x;
+    int y2 = p2.y;
+
+    int dx = abs(x2 - x1);
+    int dy = abs(y2 - y1);
+
+    int sx = (x1 < x2) ? 1 : -1;
+    int sy = (y1 < y2) ? 1 : -1;
+
+    int err = dx - dy;
+
+    while (true) {
+        if (x1 < 0 || x1 >= canvas->width || y1 < 0 || y1 >= canvas->height) {
+        } else {
+        // Рисуем текущую точку
+        Canvas::PutPixel(canvas, {x1, y1}, color);
+        Canvas::PutPixel(canvas, {x1 + 1, y1}, color);
+        Canvas::PutPixel(canvas, {x1, y1 + 1}, color);
+        Canvas::PutPixel(canvas, {x1 + 1, y1 + 1}, color);
+        }
+
+        // Если достигли конца линии, выходим из цикла
+        if (x1 == x2 && y1 == y2) {
+            break;
+        }
+
+        int e2 = 2 * err;
+        if (e2 > -dy) {
+            err -= dy;
+            x1 += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y1 += sy;
+        }
+    }
+}
+
+
+void DrawDot(Canvas::TCanvas *canvas, TPoint p1) {
+    for (int x = p1.x - 1; x <= p1.x + 1; x++) {
+        for (int y = p1.y - 1; y <= p1.y + 1; ++y) {
+            if (x < 0 || x >= canvas->width || y < 0 || y >= canvas->height) {
+                continue;
+            }
+
+            Canvas::PutPixel(canvas, { x, y }, { 0, 255, 0 });
+        }
+    }
+}
+
+
+TPoint WorldToCanvas(const Vector::TVector3 &v, 
+                             const Vector::TVector3 &pc, 
+                             const Vector::TVector3 &pv, 
+                             double angle, 
+                             Canvas::TCanvas *canvas) {
+    // Расчет направления камеры
+    Vector::TVector3 bz = Vector::Normalize(Vector::Sub(pv, pc)); // Вектор вперед
+    Vector::TVector3 bx = Vector::Normalize(Vector::Prod(bz, {0.0, 0.0, 1.0})); // Вектор вправо
+    Vector::TVector3 by = Vector::Normalize(Vector::Prod(bx, bz)); // Вектор вверх
+
+    // Перемещение точки в систему координат камеры
+    Vector::TVector3 relative = Vector::Sub(v, pc); // Вектор от камеры к точке
+    double xCam = Vector::Dot(relative, bx);
+    double yCam = Vector::Dot(relative, by);
+    double zCam = Vector::Dot(relative, bz);
+
+    // Если точка за камерой, она невидима
+    if (zCam <= 0) {
+        return { -1, -1 }; // Условный признак невидимой точки
+    }
+
+    // Угол обзора в радианах
+    double z = 1.0 / tan(angle * M_PI / 360.0);
+    double aspectRatio = static_cast<double>(canvas->width) / canvas->height;
+
+    // Преобразование в экранные координаты
+    double xProj = xCam / (zCam * aspectRatio) * z;
+    double yProj = yCam / zCam * z;
+
+    int xScreen = static_cast<int>((xProj + 1.0) * (canvas->width - 1) / 2.0);
+    int yScreen = static_cast<int>((1.0 - yProj) * (canvas->height - 1) / 2.0);
+
+    return { xScreen, yScreen };
+}
+
+
+void DebugRender(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCanvas *canvas, const std::vector<TPolygon> &polygons, const std::vector<TLight> &lights) {
+    for (int x = 0; x < canvas->width; ++x) {
+        for (int y = 0; y < canvas->height; ++y) {
+            Canvas::PutPixel(canvas, { x, y }, {0, 0, 0});
+        }
+    }
+
+    for (const auto &polygon : polygons) {
+        size_t vertexCount = 3;
+        Vector::TVector3 center = { 0.0, 0.0, 0.0 };
+
+        for (size_t i = 0; i < vertexCount; i++) {
+            // Определяем текущую вершину и следующую вершину (замыкаем полигон на последней грани)
+            const Vector::TVector3 &v1 = polygon.verticles[i];
+            const Vector::TVector3 &v2 = polygon.verticles[(i + 1) % vertexCount];
+
+            // Преобразуем координаты из мира в экранные
+            TPoint p1 = WorldToCanvas(v1, pc, pv, angle, canvas);
+            TPoint p2 = WorldToCanvas(v2, pc, pv, angle, canvas);
+
+            // Рисуем линию между текущей и следующей вершинами
+            DrawLine(canvas, p1, p2, Canvas::TColor{255, 0, 0}); // Белый цвет для линий
+            // DrawDot(canvas, p1);
+            // DrawDot(canvas, p2);
+            center = Vector::Add(center, Vector::Mult(0.33, v1));
+        }
+
+        const Vector::TVector3 n = Vector::Add(center, GetPolygonNormal(polygon));
+        TPoint p1 = WorldToCanvas(center, pc, pv, angle, canvas);
+        TPoint p2 = WorldToCanvas(n, pc, pv, angle, canvas);
+        DrawLine(canvas, p1, p2, Canvas::TColor{0, 255, 0});
+    }
+}
+
+
+
 int main() {
     char buff[256];
 
@@ -576,18 +926,15 @@ int main() {
     Canvas::TCanvas canvas;
     Canvas::Init(&canvas, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    Texture::TTexture texture;
-    Texture::Load("textures/zamay.data", texture);
-    build_space(polygons, &texture);
-
-    std::cout << "Loaded texture: (" << texture.width << ", " << texture.height << ")\n";
+    build_space(polygons);
 
     std::vector<TLight> lights = {
-        { .position = { 0.0, -6.0, 7.0 }, .color = { 0.5, 0.5, 0.5 } },
-        { .position = { 0.0, 6.0, 7.0 }, .color = { 0.5, 0.5, 0.5 } }
+        // { .position = { 10.0, 0.0, 10.0 }, .color = { 1.0, 1.0, 1.0 } },
+        // { .position = { -10.0, 0.0, 10.0 }, .color = { 1.0, 1.0, 1.0 } }
+        { .position = { 5.0, 5.0, 5.0 }, .color = { 1.0, 1.0, 1.0 } }
     };
 
-    for(unsigned int k = 0; k < 100; k += 10) { 
+    for(unsigned int k = 0; k < 150; k += 10) { 
         // cameraPos = { -6.0, 0.0, 7.0 };
         // pv = { 1.0, 0.0, -1.0 };
 
@@ -606,13 +953,13 @@ int main() {
         cameraPos = (Vector::TVector3) {
 			6.0 * sin(0.05 * k),
 			6.0 * cos(0.05 * k),
-			0.0
+			4.0
 		}; // in scalar coords
 
         pv = (Vector::TVector3) {
 			3.0 * sin(0.05 * k + M_PI),
 			3.0 * cos(0.05 * k + M_PI),
-			0.0
+			-1.0
 		};
 
         render(cameraPos, pv, 120.0, &canvas, polygons, lights);
@@ -624,6 +971,5 @@ int main() {
     }
 
     Canvas::Destroy(&canvas);
-    Texture::Destroy(texture);
     return 0;
 }
