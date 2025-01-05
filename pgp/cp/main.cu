@@ -1,8 +1,11 @@
 #include <iostream>
+#include <vector>
 #include <string>
 
 #include "utils.cuh"
 #include "canvas.cuh"
+#include "polygon.cuh"
+#include "debug_render.cuh"
 
 
 __global__ void GpuDraw(Canvas::TCanvas canvas) {
@@ -34,11 +37,20 @@ int main(int argc, char *argv[]) {
 
     Canvas::Init(&canvas, 200, 200, (deviceType == "gpu") ? Canvas::DeviceType::GPU : Canvas::DeviceType::CPU);
 
+    std::vector<Polygon::TPolygon> polygons = {
+        {
+            .verticles = { { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 3.0 }, { 3.0, 0.0, 3.0 } }
+        }
+    };
+
     if (deviceType == "gpu") {
         std::cerr << "[log] using GPU render ..." << std::endl;
         GpuDraw<<<100, 100>>>(canvas);
         cudaDeviceSynchronize();
         SAVE_CUDA(cudaGetLastError());    
+    } else if (deviceType == "debug") {
+        std::cerr << "[log] using debug render ..." << std::endl;
+        DebugRenderer::Render(canvas, polygons.data(), polygons.size());
     } else {
         std::cerr << "[log] using CPU render ..." << std::endl;
         CpuDraw(canvas);
