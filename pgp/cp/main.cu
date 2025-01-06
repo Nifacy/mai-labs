@@ -22,6 +22,36 @@ __device__ Canvas::TColor VectorToColor2(Vector::TVector3 v) {
     };
 }
 
+__device__ Vector::TVector3 ColorToVector2(Canvas::TColor color) {
+    return Vector::Mult(
+        1.0 / 255.0,
+        { (double) color.r, (double) color.g, (double) color.b}
+    );
+}
+
+__global__ void GpuSsaa(Canvas::TCanvas src, Canvas::TCanvas dst, unsigned int coef) {
+    int startX = blockDim.x * blockIdx.x + threadIdx.x;
+    int startY = blockDim.y * blockIdx.y + threadIdx.y;
+    int offsetX = blockDim.x * gridDim.x;
+    int offsetY = blockDim.y * gridDim.y;
+
+    for (unsigned int x = startX; x < dst.width; x += offsetX) {
+        for (unsigned int y = startY; y < dst.height; y += offsetY) {
+            Vector::TVector3 color = { 0.0, 0.0, 0.0 };
+
+            for (unsigned int dx = 0; dx < coef; ++dx) {
+                for (unsigned int dy = 0; dy < coef; ++dy) {
+                    Canvas::TColor srcColor = Canvas::GetPixel(&src, { x * coef + dx, y * coef + dy });
+                    color = Vector::Add(color, ColorToVector2(srcColor));
+                }
+            }
+
+            color = Vector::Mult(1.0 / coef / coef, color);
+            Canvas::PutPixel(&dst, { x, y }, VectorToColor2(color));
+        }
+    }
+}
+
 __global__ void kernel(
     TRay *current, int currentCount,
     TRay *next, int *cursor,
@@ -172,13 +202,18 @@ void CpuDraw(Canvas::TCanvas canvas) {
 }
 
 
+const unsigned int CANVAS_WIDTH = 400;
+const unsigned int CANVAS_HEIGHT = 400;
+
+
 int main(int argc, char *argv[]) {
     std::string deviceTypeArg = std::string(argv[1]);    
-    Canvas::TCanvas canvas;
+    Canvas::TCanvas canvas, extendedCanvas;
 
     DeviceType deviceType = (deviceTypeArg == "gpu") ? DeviceType::GPU : DeviceType::CPU;
 
-    Canvas::Init(&canvas, 400, 400, deviceType);
+    Canvas::Init(&canvas, CANVAS_WIDTH, CANVAS_HEIGHT, deviceType);
+    Canvas::Init(&extendedCanvas, 2 * CANVAS_WIDTH, 2 * CANVAS_HEIGHT, deviceType);
 
     std::vector<Polygon::TPolygon> polygons;
     std::vector<TLight> lights = {
@@ -192,17 +227,28 @@ int main(int argc, char *argv[]) {
 
     if (deviceTypeArg == "gpu") {
         std::cerr << "[log] using GPU render ..." << std::endl;
+
         GpuRender2(
             pc, pv, 120.0,
-            &canvas,
+            &extendedCanvas,
             polygons, lights
         );
+
+        GpuSsaa<<<200, 200>>>(extendedCanvas, canvas, 2);
+        cudaDeviceSynchronize();
+        SAVE_CUDA(cudaGetLastError());
+
     } else if (deviceTypeArg == "cpu") {
         std::cerr << "[log] using CPU render ..." << std::endl;
+
         render(
             pc, pv, 120.0,
-            &canvas,
-            polygons, lights);
+            &extendedCanvas,
+            polygons, lights
+        );
+
+        CpuSsaa(&extendedCanvas, &canvas, 2);
+
     } else {
         std::cerr << "[log] using debug render ..." << std::endl;
         DebugRenderer::Render(canvas, polygons.data(), polygons.size());
@@ -210,6 +256,7 @@ int main(int argc, char *argv[]) {
 
     Canvas::Dump(&canvas, "build/0.data");
     Canvas::Destroy(&canvas);
+    Canvas::Destroy(&extendedCanvas);
 
     return 0;
 }

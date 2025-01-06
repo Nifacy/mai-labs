@@ -15,6 +15,31 @@ Canvas::TColor VectorToColor(Vector::TVector3 v) {
     };
 }
 
+Vector::TVector3 ColorToVector(Canvas::TColor color) {
+    return Vector::Mult(
+        1.0 / 255.0,
+        { (double) color.r, (double) color.g, (double) color.b}
+    );
+}
+
+void CpuSsaa(Canvas::TCanvas *src, Canvas::TCanvas *dst, unsigned int coef) {
+    for (unsigned int x = 0; x < dst->width; ++x) {
+        for (unsigned int y = 0; y < dst->height; ++y) {
+            Vector::TVector3 color = { 0.0, 0.0, 0.0 };
+
+            for (unsigned int dx = 0; dx < coef; ++dx) {
+                for (unsigned int dy = 0; dy < coef; ++dy) {
+                    Canvas::TColor srcColor = Canvas::GetPixel(src, { x * coef + dx, y * coef + dy });
+                    color = Vector::Add(color, ColorToVector(srcColor));
+                }
+            }
+
+            color = Vector::Mult(1.0 / coef / coef, color);
+            Canvas::PutPixel(dst, { x, y }, VectorToColor(color));
+        }
+    }
+}
+
 void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCanvas *canvas, std::vector<Polygon::TPolygon> &polygons, std::vector<TLight> &lights) {
     double dw = 2.0 / (canvas->width - 1.0);
     double dh = 2.0 / (canvas->height - 1.0);
