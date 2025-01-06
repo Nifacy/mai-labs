@@ -123,13 +123,24 @@ void BuildModel(const TModelConfig &config, const std::vector<TFace> &mesh, std:
             .reflection = config.reflection,
             .transparent = config.transparent,
             .blend = config.blend,
-            .isLightSource = config.isLightSource
+            .isLightSource = config.isLightSource,
+            .texture = {
+                .enabled = false,
+                .texture = TextureProjection::TTextureProjection {}
+            }
         });
     }
 }
 
 
-void BuildLampLine(const TModelConfig &modelConfig, const std::vector<TFace> &mesh, int n, std::vector<Polygon::TPolygon> &out) {
+struct TLampLineConfig {
+    double frameOffset;
+    double heightScale;
+    double widthScale;
+};
+
+
+void BuildLampLine(const TModelConfig &modelConfig, const std::vector<TFace> &mesh, int n, TLampLineConfig config, std::vector<Polygon::TPolygon> &out) {
     for (int t1 = 0; t1 < mesh.size(); ++t1) {
         for (int t2 = t1 + 1; t2 < mesh.size(); ++t2) {
             Polygon::TPolygon a = { .verticles = { mesh[t1].vertices[0], mesh[t1].vertices[1], mesh[t1].vertices[2] } };
@@ -156,17 +167,17 @@ void BuildLampLine(const TModelConfig &modelConfig, const std::vector<TFace> &me
             }
 
             Vector::TVector3 v = Vector::Sub(points.at(1), points.at(0));
-            Vector::TVector3 d = Vector::Normalize(Vector::Add(na, nb));
-            Vector::TVector3 s = Vector::Normalize(Vector::Prod(d, v));
+            Vector::TVector3 d = Vector::Mult(config.frameOffset, Vector::Normalize(Vector::Add(na, nb)));
+            Vector::TVector3 s = Vector::Mult(config.heightScale, Vector::Normalize(Vector::Prod(d, v)));
 
             Vector::TVector3 diff1 = Vector::Mult(0.1, Vector::Normalize(Vector::Add(d, s)));
             Vector::TVector3 diff2 = Vector::Mult(0.1, Vector::Normalize(Vector::Sub(d, s)));
 
             std::vector<Vector::TVector3> vertices = {
-                Vector::Add(points[0], diff1),
-                Vector::Add(points[0], diff2),
-                Vector::Add(points[1], diff1),
-                Vector::Add(points[1], diff2)
+                Vector::Add(Vector::Add(points[0], Vector::Mult((1.0 - config.widthScale) * 0.5, v)), diff1),
+                Vector::Add(Vector::Add(points[0], Vector::Mult((1.0 - config.widthScale) * 0.5, v)), diff2),
+                Vector::Add(Vector::Add(points[0], Vector::Mult((1.0 - config.widthScale) * 0.5 + config.widthScale, v)), diff1),
+                Vector::Add(Vector::Add(points[0], Vector::Mult((1.0 - config.widthScale) * 0.5 + config.widthScale, v)), diff2)
             };
 
             std::vector<TFace> faces = {
@@ -184,13 +195,13 @@ void BuildLampLine(const TModelConfig &modelConfig, const std::vector<TFace> &me
                 .isLightSource = true
             }, faces, out);
 
-            Vector::TVector3 e1 = Vector::Mult(0.05, Vector::Normalize(v));
-            Vector::TVector3 e2 = Vector::Mult(0.05, Vector::Normalize(s));
-            Vector::TVector3 e3 = Vector::Mult(0.1, Vector::Normalize(d));
+            Vector::TVector3 e1 = Vector::Mult(0.05 * config.heightScale, Vector::Normalize(v));
+            Vector::TVector3 e2 = Vector::Mult(0.05 * config.heightScale, Vector::Normalize(s));
+            Vector::TVector3 e3 = Vector::Mult(0.1 * config.frameOffset, Vector::Normalize(d));
 
             for(int k = 0; k < n; k++) {
                 double t = 1.0 / (n + 1) * (k + 1);
-                Vector::TVector3 lampPos = Vector::Add(points[0], Vector::Mult(t, v));
+                Vector::TVector3 lampPos = Vector::Add(points[0], Vector::Mult((1.0 - config.widthScale) * 0.5 + t * config.widthScale, v));
 
                 std::vector<Vector::TVector3> lampVertices = {
                     Vector::Add(Vector::Add(e2, Vector::Add(e1, e3)), lampPos),
@@ -225,7 +236,7 @@ void BuildFloor(std::vector<Polygon::TPolygon> &out, DeviceType deviceType) {
     Texture::Load(&floorTexture, "textures/floor.data", deviceType);
 
     out.push_back(Polygon::TPolygon {
-        .verticles = { { -5.0, -5.0, 0.0 }, { 5.0, -5.0, 0.0 }, { -5.0, 5.0, 0.0 } },
+        .verticles = { { -5.0, -5.0, 1.0 }, { 5.0, -5.0, 0.0 }, { -5.0, 5.0, 0.0 } },
         .color = { 1.0, 1.0, 1.0 },
         .reflection = 0.0,
         .transparent = 0.0,
@@ -241,7 +252,7 @@ void BuildFloor(std::vector<Polygon::TPolygon> &out, DeviceType deviceType) {
     });
 
     out.push_back(Polygon::TPolygon {
-        .verticles = { { -5.0, 5.0, 0.0 }, { 5.0, -5.0, 0.0 }, { 5.0, 5.0, 0.0 } },
+        .verticles = { { -5.0, 5.0, 0.0 }, { 5.0, -5.0, 0.0 }, { 5.0, 5.0, 1.0 } },
         .color = { 1.0, 1.0, 1.0 },
         .reflection = 0.0,
         .transparent = 0.0,
@@ -258,76 +269,61 @@ void BuildFloor(std::vector<Polygon::TPolygon> &out, DeviceType deviceType) {
 }
 
 
+void BuildTetrahedron(std::vector<Polygon::TPolygon> &out) {
+    std::vector<TFace> mesh = LoadMesh("objects/tetrahedron.obj");
+    TModelConfig config = {
+        .pos = { -3.0, -3.0, 1.0 },
+        .color = { 0.6, 0.0, 0.0 },
+        .scale = 4.0,
+        .reflection = 1.0,
+        .transparent = 1.0,
+        .blend = 1.0,
+        .isLightSource = false
+    };
+
+    BuildLampLine(config, mesh, 8, { .frameOffset = 1.0, .heightScale = 0.5, .widthScale = 0.8 }, out);
+    BuildModel(config, mesh, out);
+}
+
+void BuildDodecahedron(std::vector<Polygon::TPolygon> &out) {
+    std::vector<TFace> mesh = LoadMesh("objects/dodecahedron.obj");
+    TModelConfig config = {
+        .pos = { 3.0, 3.0, 2.5 },
+        .color = { 0.0, 0.6, 0.0 },
+        .scale = 0.2,
+        .reflection = 1.0,
+        .transparent = 0.6,
+        .blend = 1.0,
+        .isLightSource = false
+    };
+
+    BuildLampLine(config, mesh, 8, { .frameOffset = 2.5, .heightScale = 2.5, .widthScale = 1.0 }, out);
+    BuildModel(config, mesh, out);
+}
+
+
+void BuildIcosahedron(std::vector<Polygon::TPolygon> &out) {
+    std::vector<TFace> mesh = LoadMesh("objects/icosahedron.obj");
+    TModelConfig config = {
+        .pos = { -3.0, 3.0, 2.5 },
+        .color = { 0.0, 0.6, 0.6 },
+        .scale = 1.0,
+        .reflection = 1.0,
+        .transparent = 1.0,
+        .blend = 1.0,
+        .isLightSource = false
+    };
+
+    BuildLampLine(config, mesh, 8, { .frameOffset = 1.1, .heightScale = 0.3, .widthScale = 1.0 }, out);
+    BuildModel(config, mesh, out);
+}
+
+
 void build_space(std::vector<Polygon::TPolygon> &out, DeviceType deviceType) {
     BuildFloor(out, deviceType);
-    // TextureProjection::TTextureProjection *floorProj1 = new TextureProjection::TTextureProjection {
-    //     .src = *floorTexture,
-    //     .verticles = { { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 } }
-    // };
-
-    // TextureProjection::TTextureProjection *floorProj2 = new TextureProjection::TTextureProjection {
-    //     .src = *floorTexture,
-    //     .verticles = { { 1.0, 1.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 } }
-    // };
-
-    // out.push_back({
-    //     .verticles = { { -5.0, -5.0, 0.0 }, { 5.0, -5.0, 0.0 }, { -5.0, 5.0, 0.0 } },
-    //     .color = { 1.0, 1.0, 1.0 },
-    //     .texture = floorProj1
-    // });
-
-    // out.push_back({
-    //     .verticles = { { -5.0, 5.0, 0.0 }, { 5.0, -5.0, 0.0 }, { 5.0, 5.0, 0.0 } },
-    //     .color = { 1.0, 1.0, 1.0 },
-    //     .texture = floorProj2
-    // });
-
-    // cube
-    // std::vector<TFace> cubeMesh = LoadCubeMesh();
-    // TModelConfig cubeConfig =         {
-    //         .pos = { 0.0, 0.0, 0.5 + 2.0 * EPS },
-    //         .color = { 0.2, 1.0, 0.2 },
-    //         .scale = 3.0,
-    //         .reflection = 1.0,
-    //         .transparent = 0.0,
-    //         .blend = 1.0
-    //     };
-
-    // BuildLampLine(
-    //     cubeConfig,
-    //     cubeMesh,
-    //     2,
-    //     out
-    // );
-
-    // buildCube(
-    //     {
-    //         .pos = { 0.0, 0.0, 1.0 + 2.0 * EPS },
-    //         .color = { 1.0, 0.5, 0.5 },
-    //         .size = 1.0,
-    //         .reflection = 1.0,
-    //         .transparent = 0.0,
-    //         .blend = 0.0
-    //     },
-    //     out
-    // );
-
-    // BuildModel(
-    //     cubeConfig,
-    //     cubeMesh,
-    //     out
-    // );
-
-    // std::vector<TFace> mesh = LoadMesh("objects/model2.obj");
-
-    // BuildLampLine(
-    //     cubeConfig,
-    //     mesh,
-    //     2,
-    //     out
-    // );
-
-    // BuildModel(cubeConfig, mesh, out);
+    BuildIcosahedron(out);
+    BuildTetrahedron(out);
+    BuildDodecahedron(out);
 }
 
 #endif

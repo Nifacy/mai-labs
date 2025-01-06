@@ -102,8 +102,8 @@ namespace DebugRenderer {
     void Render(Canvas::TCanvas canvas, Polygon::TPolygon *polygons, size_t polygonsAmount) {
         // TODO: remove when camera will be added
         double angle = 120.0;
-        Vector::TVector3 pc = { 0.0, 6.0, 4.0 };
-        Vector::TVector3 pv = { 0.0, -3.0, -1.0 };
+        Vector::TVector3 pc = { 0.4, 6.0, 6.0 };
+        Vector::TVector3 pv = { 0.0, -3.0, -2.0 };
 
         for (unsigned int x = 0; x < canvas.width; ++x) {
             for (unsigned int y = 0; y < canvas.height; ++y) {

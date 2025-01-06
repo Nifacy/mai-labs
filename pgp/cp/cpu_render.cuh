@@ -67,15 +67,7 @@ void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCan
         for (int j = 0; j < currentCount; ++j) {
             TRay el = current[j];
             Canvas::TColor color = VectorToColor(Ray(el, polygons.data(), polygons.size(), lights.data(), lights.size(), next, &nextCount, false));
-            Canvas::TColor canvasColor = Canvas::GetPixel(canvas, { .x = el.pixelPos.x, .y = el.pixelPos.y });
-            Canvas::TColor resultColor = {
-                .r = (unsigned char) std::min(255, int(color.r) + int(canvasColor.r)),
-                .g = (unsigned char) std::min(255, int(color.g) + int(canvasColor.g)),
-                .b = (unsigned char) std::min(255, int(color.b) + int(canvasColor.b)),
-                .a = (unsigned char) std::min(255, int(color.a) + int(canvasColor.a))
-            };
-
-            Canvas::PutPixel(canvas, { .x = el.pixelPos.x, .y = el.pixelPos.y }, resultColor);
+            Canvas::AddPixel(canvas, { .x = el.pixelPos.x, .y = el.pixelPos.y }, color);
         }
 
         currentCount = 0;

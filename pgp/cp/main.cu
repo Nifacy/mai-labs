@@ -36,16 +36,9 @@ __global__ void kernel(
     for (int j = start; j < currentCount; j += offset) {
         TRay el = current[j];
         Canvas::TColor color = VectorToColor2(Ray(el, polygons, polygonsAmount, lights, lightsAmount, next, cursor, true));
-        atomicAdd(lock, 1);
-        Canvas::TColor canvasColor = Canvas::GetPixel(&canvas, { .x = el.pixelPos.x, .y = el.pixelPos.y });
-        Canvas::TColor resultColor = {
-            .r = (unsigned char) Min(255, int(color.r) + int(canvasColor.r)),
-            .g = (unsigned char) Min(255, int(color.g) + int(canvasColor.g)),
-            .b = (unsigned char) Min(255, int(color.b) + int(canvasColor.b)),
-            .a = (unsigned char) Min(255, int(color.a) + int(canvasColor.a))
-        };
 
-        Canvas::PutPixel(&canvas, { .x = el.pixelPos.x, .y = el.pixelPos.y }, resultColor);
+        atomicAdd(lock, 1);
+        Canvas::AddPixel(&canvas, { .x = el.pixelPos.x, .y = el.pixelPos.y }, color);
         atomicSub(lock, 1);
     }
 }
@@ -72,11 +65,11 @@ __global__ void initRays(Canvas::TCanvas canvas, Vector::TVector3 pc, Vector::TV
                 .pos = pc,
                 .dir = Vector::Normalize(dir),
                 .color = { 1.0, 1.0, 1.0 },
-                .pixelPos = { i, canvas.height - 1 - j },
+                .pixelPos = { .x = i, .y = canvas.height - 1 - j },
                 .depth = 0
             };
 
-            Canvas::PutPixel(&canvas, { i, canvas.height - 1 - j }, { 0, 0, 0, 255 });
+            Canvas::PutPixel(&canvas, { .x = i, .y = canvas.height - 1 - j }, { 0, 0, 0, 255 });
 		}
 	}
 }
@@ -194,21 +187,20 @@ int main(int argc, char *argv[]) {
 
     build_space(polygons, deviceType);
 
+    Vector::TVector3 pc = { 0.0, 6.0, 4.0 };
+    Vector::TVector3 pv = { 0.0, -3.0, -1.2 };
+
     if (deviceTypeArg == "gpu") {
         std::cerr << "[log] using GPU render ..." << std::endl;
         GpuRender2(
-            { 0.0, 6.0, 4.0 },
-            { 0.0, -3.0, -1.0 },
-            120.0,
+            pc, pv, 120.0,
             &canvas,
             polygons, lights
         );
     } else if (deviceTypeArg == "cpu") {
         std::cerr << "[log] using CPU render ..." << std::endl;
         render(
-            { 0.0, 6.0, 4.0 },
-            { 0.0, -3.0, -1.0 },
-            120.0,
+            pc, pv, 120.0,
             &canvas,
             polygons, lights);
     } else {

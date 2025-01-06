@@ -100,14 +100,24 @@ namespace Canvas {
         #endif
     }
 
-    __host__ __device__ void AddPixel(TCanvas *canvas, TPosition pos, TColor color) {
-        canvas->data[pos.y * canvas->width + pos.x].r += color.r;
-        canvas->data[pos.y * canvas->width + pos.x].g += color.g;
-        canvas->data[pos.y * canvas->width + pos.x].b += color.b;
-    }
-
     __host__ __device__ TColor GetPixel(TCanvas *canvas, TPosition pos) {
         return canvas->data[pos.y * canvas->width + pos.x];
+    }
+
+    __host__ __device__ void AddPixel(TCanvas *canvas, TPosition pos, TColor color) {
+        if (pos.x >= canvas->width || pos.y >= canvas->height) {
+            return;
+        }
+
+        TColor sourceColor = GetPixel(canvas, pos);
+        Canvas::TColor resultColor = {
+            .r = (unsigned char) Min(255, int(color.r) + int(sourceColor.r)),
+            .g = (unsigned char) Min(255, int(color.g) + int(sourceColor.g)),
+            .b = (unsigned char) Min(255, int(color.b) + int(sourceColor.b)),
+            .a = (unsigned char) Min(255, int(color.a) + int(sourceColor.a))
+        };
+
+        PutPixel(canvas, pos, resultColor);
     }
 
 }
