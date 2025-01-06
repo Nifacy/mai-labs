@@ -5,6 +5,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "texture.cuh"
+#include "texture_projection.cuh"
 #include "polygon.cuh"
 #include "vector.cuh"
 
@@ -218,11 +220,46 @@ void BuildLampLine(const TModelConfig &modelConfig, const std::vector<TFace> &me
 }
 
 
-void build_space(std::vector<Polygon::TPolygon> &out) {
-    // floor
-    // Texture::TTexture *floorTexture = new Texture::TTexture {};
-    // Texture::Load("textures/floor.data", *floorTexture);
+void BuildFloor(std::vector<Polygon::TPolygon> &out, DeviceType deviceType) {
+    Texture::TTexture floorTexture;
+    Texture::Load(&floorTexture, "textures/floor.data", deviceType);
 
+    out.push_back(Polygon::TPolygon {
+        .verticles = { { -5.0, -5.0, 0.0 }, { 5.0, -5.0, 0.0 }, { -5.0, 5.0, 0.0 } },
+        .color = { 1.0, 1.0, 1.0 },
+        .reflection = 0.0,
+        .transparent = 0.0,
+        .blend = 0.0,
+        .isLightSource = false,
+        .texture = {
+            .enabled = true,
+            .texture = TextureProjection::TTextureProjection {
+                .src = floorTexture,
+                .verticles = { { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 } }
+            }
+        }
+    });
+
+    out.push_back(Polygon::TPolygon {
+        .verticles = { { -5.0, 5.0, 0.0 }, { 5.0, -5.0, 0.0 }, { 5.0, 5.0, 0.0 } },
+        .color = { 1.0, 1.0, 1.0 },
+        .reflection = 0.0,
+        .transparent = 0.0,
+        .blend = 0.0,
+        .isLightSource = false,
+        .texture = {
+            .enabled = true,
+            .texture = TextureProjection::TTextureProjection {
+                .src = floorTexture,
+                .verticles = { { 1.0, 1.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 } }
+            }
+        }
+    });
+}
+
+
+void build_space(std::vector<Polygon::TPolygon> &out, DeviceType deviceType) {
+    BuildFloor(out, deviceType);
     // TextureProjection::TTextureProjection *floorProj1 = new TextureProjection::TTextureProjection {
     //     .src = *floorTexture,
     //     .verticles = { { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 } }
@@ -246,22 +283,22 @@ void build_space(std::vector<Polygon::TPolygon> &out) {
     // });
 
     // cube
-    std::vector<TFace> cubeMesh = LoadCubeMesh();
-    TModelConfig cubeConfig =         {
-            .pos = { 0.0, 0.0, 0.5 + 2.0 * EPS },
-            .color = { 0.2, 1.0, 0.2 },
-            .scale = 3.0,
-            .reflection = 1.0,
-            .transparent = 0.0,
-            .blend = 1.0
-        };
+    // std::vector<TFace> cubeMesh = LoadCubeMesh();
+    // TModelConfig cubeConfig =         {
+    //         .pos = { 0.0, 0.0, 0.5 + 2.0 * EPS },
+    //         .color = { 0.2, 1.0, 0.2 },
+    //         .scale = 3.0,
+    //         .reflection = 1.0,
+    //         .transparent = 0.0,
+    //         .blend = 1.0
+    //     };
 
-    BuildLampLine(
-        cubeConfig,
-        cubeMesh,
-        2,
-        out
-    );
+    // BuildLampLine(
+    //     cubeConfig,
+    //     cubeMesh,
+    //     2,
+    //     out
+    // );
 
     // buildCube(
     //     {
@@ -275,11 +312,11 @@ void build_space(std::vector<Polygon::TPolygon> &out) {
     //     out
     // );
 
-    BuildModel(
-        cubeConfig,
-        cubeMesh,
-        out
-    );
+    // BuildModel(
+    //     cubeConfig,
+    //     cubeMesh,
+    //     out
+    // );
 
     // std::vector<TFace> mesh = LoadMesh("objects/model2.obj");
 

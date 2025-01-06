@@ -16,4 +16,25 @@
     }                                                \
 }
 
+/* Common types */
+
+typedef enum {
+    CPU,
+    GPU
+} DeviceType;
+
+/* Help Methods */
+
+template<typename T>
+__host__ __device__ T Max(T a, T b) {
+    if (a > b) return a;
+    return b;
+}
+
+template<typename T>
+__host__ __device__ T Min(T a, T b) {
+    if (a < b) return a;
+    return b;
+}
+
 #endif // _UTILS_H_

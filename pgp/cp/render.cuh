@@ -1,6 +1,8 @@
 #ifndef _RENDER_H_
 #define _RENDER_H_
 
+#include "utils.cuh"
+#include "texture_projection.cuh"
 #include "vector.cuh"
 #include "canvas.cuh"
 #include "polygon.cuh"
@@ -37,19 +39,6 @@ const double EPS = 1e-3;
 const double EMBIENT_COEF = 0.1;
 const double SPECULAR_COEF = 0.5;
 const double DIFFUSE_COEF = 1.0;
-
-
-template<typename T>
-__host__ __device__ T Max(T a, T b) {
-    if (a > b) return a;
-    return b;
-}
-
-template<typename T>
-__host__ __device__ T Min(T a, T b) {
-    if (a < b) return a;
-    return b;
-}
 
 __host__ __device__ Vector::TVector3 _Reflect(Vector::TVector3 v, Vector::TVector3 normal) {
     double k = -2.0 * Vector::Dot(v, normal);
@@ -88,7 +77,28 @@ __host__ __device__ THit _CheckHitWithPolygon(Vector::TVector3 pos, Vector::TVec
 }
 
 __host__ __device__ Vector::TVector3 _GetPolygonPixelColor(Polygon::TPolygon polygon, Vector::TVector3 hitPos) {
-    return polygon.color;
+    if (!polygon.texture.enabled) {
+        return polygon.color;
+    }
+
+    Vector::TVector3 v0 = polygon.verticles[0];
+    Vector::TVector3 v1 = polygon.verticles[1];
+    Vector::TVector3 v2 = polygon.verticles[2];
+
+    Vector::TVector3 E1 = Vector::Sub(v1, v0);
+    Vector::TVector3 E2 = Vector::Sub(v2, v0);
+    Vector::TVector3 E3 = Vector::Sub(v0, hitPos);
+    Vector::TVector3 E4 = Vector::Sub(v1, hitPos);
+    Vector::TVector3 E5 = Vector::Sub(v2, hitPos);
+
+    double A = 0.5 * Vector::Length(Vector::Prod(E1, E2));
+    double A1 = 0.5 * Vector::Length(Vector::Prod(E3, E4));
+    double A2 = 0.5 * Vector::Length(Vector::Prod(E4, E5));
+
+    double a1 = A1 / A;
+    double a2 = A2 / A;
+
+    return TextureProjection::GetPixel(&polygon.texture.texture, { a1, a2 });
 }
 
 __host__ __device__ Vector::TVector3 _GetColor(

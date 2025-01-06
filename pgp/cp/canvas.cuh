@@ -18,11 +18,6 @@ namespace Canvas {
         unsigned char a;
     } TColor;
 
-    typedef enum {
-        CPU,
-        GPU
-    } DeviceType;
-
     typedef struct {
         unsigned int width;
         unsigned int height;
@@ -43,7 +38,7 @@ namespace Canvas {
         canvas->height = height;
         canvas->deviceType = device;
 
-        if (device == GPU) {
+        if (device == DeviceType::GPU) {
             SAVE_CUDA(cudaMalloc(&canvas->data, sizeof(TColor) * width * height));
             SAVE_CUDA(cudaMalloc(&canvas->lock, sizeof(int)));
             SAVE_CUDA(cudaMemset(canvas->lock, 0, sizeof(int)));
@@ -56,7 +51,7 @@ namespace Canvas {
     }
 
     __host__ void Destroy(TCanvas *canvas) {
-        if (canvas->deviceType == GPU) {
+        if (canvas->deviceType == DeviceType::GPU) {
             cudaFree(canvas->data);
             cudaFree(canvas->lock);
         } else {
@@ -73,7 +68,7 @@ namespace Canvas {
         std::fwrite(&canvas->width, sizeof(unsigned int), 1, out);
         std::fwrite(&canvas->height, sizeof(unsigned int), 1, out);
 
-        if (canvas->deviceType == GPU) {
+        if (canvas->deviceType == DeviceType::GPU) {
             TColor *data = (TColor*) std::malloc(sizeof(TColor) * canvas->width * canvas->height);
             if (!data) {
                 throw std::runtime_error("Failed to allocate CPU memory for dumping GPU data");

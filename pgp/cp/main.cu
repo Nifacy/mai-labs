@@ -2,6 +2,8 @@
 #include <vector>
 #include <string>
 
+#include "texture.cuh"
+#include "texture_projection.cuh"
 #include "utils.cuh"
 #include "canvas.cuh"
 #include "polygon.cuh"
@@ -178,19 +180,21 @@ void CpuDraw(Canvas::TCanvas canvas) {
 
 
 int main(int argc, char *argv[]) {
-    std::string deviceType = std::string(argv[1]);    
+    std::string deviceTypeArg = std::string(argv[1]);    
     Canvas::TCanvas canvas;
 
-    Canvas::Init(&canvas, 400, 400, (deviceType == "gpu") ? Canvas::DeviceType::GPU : Canvas::DeviceType::CPU);
+    DeviceType deviceType = (deviceTypeArg == "gpu") ? DeviceType::GPU : DeviceType::CPU;
+
+    Canvas::Init(&canvas, 400, 400, deviceType);
 
     std::vector<Polygon::TPolygon> polygons;
     std::vector<TLight> lights = {
         { .position = { 5.0, 5.0, 5.0 }, .color = { 1.0, 1.0, 1.0 } }
     };
 
-    build_space(polygons);
+    build_space(polygons, deviceType);
 
-    if (deviceType == "gpu") {
+    if (deviceTypeArg == "gpu") {
         std::cerr << "[log] using GPU render ..." << std::endl;
         GpuRender2(
             { 0.0, 6.0, 4.0 },
@@ -199,8 +203,8 @@ int main(int argc, char *argv[]) {
             &canvas,
             polygons, lights
         );
-    } else if (deviceType == "debug") {
-        std::cerr << "[log] using debug render ..." << std::endl;
+    } else if (deviceTypeArg == "cpu") {
+        std::cerr << "[log] using CPU render ..." << std::endl;
         render(
             { 0.0, 6.0, 4.0 },
             { 0.0, -3.0, -1.0 },
@@ -208,8 +212,8 @@ int main(int argc, char *argv[]) {
             &canvas,
             polygons, lights);
     } else {
-        std::cerr << "[log] using CPU render ..." << std::endl;
-        CpuDraw(canvas);
+        std::cerr << "[log] using debug render ..." << std::endl;
+        DebugRenderer::Render(canvas, polygons.data(), polygons.size());
     }
 
     Canvas::Dump(&canvas, "build/0.data");

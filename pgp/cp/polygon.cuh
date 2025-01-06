@@ -2,10 +2,16 @@
 #define _POLYGON_H_
 
 #include "vector.cuh"
+#include "texture_projection.cuh"
 
 namespace Polygon {
 
     /* Types */
+
+    struct TPolygonTexture {
+        bool enabled;
+        TextureProjection::TTextureProjection texture;
+    };
 
     struct TPolygon {
         Vector::TVector3 verticles[3];
@@ -14,6 +20,7 @@ namespace Polygon {
         double transparent;
         double blend;
         bool isLightSource;
+        TPolygonTexture texture;
     };
 
     /* Methods */
