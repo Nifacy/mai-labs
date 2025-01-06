@@ -9,6 +9,11 @@ namespace Polygon {
 
     struct TPolygon {
         Vector::TVector3 verticles[3];
+        Vector::TVector3 color;
+        double reflection;
+        double transparent;
+        double blend;
+        bool isLightSource;
     };
 
     /* Methods */
