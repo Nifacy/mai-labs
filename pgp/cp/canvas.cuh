@@ -2,6 +2,7 @@
 #define _CANVAS_H_
 
 #include <cstdio>
+#include <stdio.h>
 #include <stdexcept>
 
 #include "utils.cuh"
@@ -27,6 +28,7 @@ namespace Canvas {
         unsigned int height;
         DeviceType deviceType;
         TColor *data;
+        int *lock;
     } TCanvas;
 
     typedef struct {
@@ -43,6 +45,8 @@ namespace Canvas {
 
         if (device == GPU) {
             SAVE_CUDA(cudaMalloc(&canvas->data, sizeof(TColor) * width * height));
+            SAVE_CUDA(cudaMalloc(&canvas->lock, sizeof(int)));
+            SAVE_CUDA(cudaMemset(canvas->lock, 0, sizeof(int)));
         } else {
             canvas->data = (TColor*) std::malloc(sizeof(TColor) * width * height);
             if (!canvas->data) {
@@ -54,6 +58,7 @@ namespace Canvas {
     __host__ void Destroy(TCanvas *canvas) {
         if (canvas->deviceType == GPU) {
             cudaFree(canvas->data);
+            cudaFree(canvas->lock);
         } else {
             std::free(canvas->data);
         }
@@ -91,7 +96,19 @@ namespace Canvas {
     }
 
     __host__ __device__ void PutPixel(TCanvas *canvas, TPosition pos, TColor color) {
+        #ifdef __CUDA_ARCH__
+            atomicAdd(canvas->lock, 1);
+        #endif
         canvas->data[pos.y * canvas->width + pos.x] = color;
+        #ifdef __CUDA_ARCH__
+            atomicSub(canvas->lock, 1);
+        #endif
+    }
+
+    __host__ __device__ void AddPixel(TCanvas *canvas, TPosition pos, TColor color) {
+        canvas->data[pos.y * canvas->width + pos.x].r += color.r;
+        canvas->data[pos.y * canvas->width + pos.x].g += color.g;
+        canvas->data[pos.y * canvas->width + pos.x].b += color.b;
     }
 
     __host__ __device__ TColor GetPixel(TCanvas *canvas, TPosition pos) {

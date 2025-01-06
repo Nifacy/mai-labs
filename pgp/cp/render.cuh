@@ -38,13 +38,26 @@ const double EMBIENT_COEF = 0.1;
 const double SPECULAR_COEF = 0.5;
 const double DIFFUSE_COEF = 1.0;
 
-Vector::TVector3 _Reflect(Vector::TVector3 v, Vector::TVector3 normal) {
+
+template<typename T>
+__host__ __device__ T Max(T a, T b) {
+    if (a > b) return a;
+    return b;
+}
+
+template<typename T>
+__host__ __device__ T Min(T a, T b) {
+    if (a < b) return a;
+    return b;
+}
+
+__host__ __device__ Vector::TVector3 _Reflect(Vector::TVector3 v, Vector::TVector3 normal) {
     double k = -2.0 * Vector::Dot(v, normal);
     Vector::TVector3 temp = Vector::Mult(k, normal);
     return Vector::Normalize(Vector::Add(temp, v));
 }
 
-THit _CheckHitWithPolygon(Vector::TVector3 pos, Vector::TVector3 dir, Polygon::TPolygon polygon) {
+__host__ __device__ THit _CheckHitWithPolygon(Vector::TVector3 pos, Vector::TVector3 dir, Polygon::TPolygon polygon) {
     THit emptyHit = { .exists = false, .t = 0.0 };
 
     Vector::TVector3 v0 = polygon.verticles[0];
@@ -74,11 +87,11 @@ THit _CheckHitWithPolygon(Vector::TVector3 pos, Vector::TVector3 dir, Polygon::T
     return THit { .exists = true, .t = t };
 }
 
-Vector::TVector3 _GetPolygonPixelColor(Polygon::TPolygon polygon, Vector::TVector3 hitPos) {
+__host__ __device__ Vector::TVector3 _GetPolygonPixelColor(Polygon::TPolygon polygon, Vector::TVector3 hitPos) {
     return polygon.color;
 }
 
-Vector::TVector3 _GetColor(
+__host__ __device__ Vector::TVector3 _GetColor(
     Vector::TVector3 hitPos,
     Vector::TVector3 dir,
     size_t polygonId,
@@ -108,10 +121,6 @@ Vector::TVector3 _GetColor(
         // shade coef
         double shadeCoef = 1.0;
         THit currHit = _CheckHitWithPolygon(lightPos, lightDir, polygons[polygonId]);
-        if (!currHit.exists) {
-            std::cerr << "[error] unexpected not existent hit\n";
-            exit(1);
-        }
 
         for (size_t i = 0; i < polygonsAmount; ++i) {
             if (i == polygonId) continue;
@@ -125,7 +134,7 @@ Vector::TVector3 _GetColor(
         // diffuse light
         Vector::TVector3 l = Vector::Mult(-1.0, lightDir);
         Vector::TVector3 n = Polygon::GetNormal(polygon);
-        double diffuseAngle = std::max(0.0, Vector::Dot(n, l));
+        double diffuseAngle = Max(0.0, Vector::Dot(n, l));
         double diffuseCoef = DIFFUSE_COEF * diffuseAngle;
 
         // specular light
@@ -133,8 +142,7 @@ Vector::TVector3 _GetColor(
             Vector::Sub(hitPos, lightPos),
             Polygon::GetNormal(polygon)
         ));
-        double specularAngle = std::max(0.0, Vector::Dot(reflectedLightDirection, dirNormalized));
-        if (specularAngle >= 1.0) std::cout << specularAngle << std::endl;
+        double specularAngle = Max(0.0, Vector::Dot(reflectedLightDirection, dirNormalized));
         double specularCoef = polygon.blend * SPECULAR_COEF * std::pow(specularAngle, 9);
 
         // total color
@@ -146,15 +154,15 @@ Vector::TVector3 _GetColor(
     totalColor = Vector::Mult(totalColor, _GetPolygonPixelColor(polygon, hitPos));
 
     totalColor = {
-        std::min(1.0, std::max(0.0, totalColor.x)),
-        std::min(1.0, std::max(0.0, totalColor.y)),
-        std::min(1.0, std::max(0.0, totalColor.z))
+        Min(1.0, Max(0.0, totalColor.x)),
+        Min(1.0, Max(0.0, totalColor.y)),
+        Min(1.0, Max(0.0, totalColor.z))
     };
 
     return totalColor;
 }
 
-TReflectedRay _GetReflectedRay(Vector::TVector3 pos, Vector::TVector3 dir, Polygon::TPolygon polygon, Vector::TVector3 hitPosition) {
+__host__ __device__ TReflectedRay _GetReflectedRay(Vector::TVector3 pos, Vector::TVector3 dir, Polygon::TPolygon polygon, Vector::TVector3 hitPosition) {
     Vector::TVector3 n = Polygon::GetNormal(polygon);
 
     Vector::TVector3 nextDir = _Reflect(dir, n);
@@ -163,11 +171,12 @@ TReflectedRay _GetReflectedRay(Vector::TVector3 pos, Vector::TVector3 dir, Polyg
     return { .pos = nextPos, .dir = nextDir };
 }
 
-Vector::TVector3 Ray(
+__host__ __device__ Vector::TVector3 Ray(
     TRay ray,
     Polygon::TPolygon *polygons, size_t polygonsAmount,
     TLight *lights, size_t lightsAmount,
-    TRay *nextRays, size_t *cursor
+    TRay *nextRays, int *cursor,
+    bool onGpu
 ) { 
     if (ray.depth > 3) {
         return { 0.0, 0.0, 0.0 };
@@ -203,28 +212,44 @@ Vector::TVector3 Ray(
     if (hitPolygon.reflection > 0.0) {
         TReflectedRay nextRay = _GetReflectedRay(ray.pos, ray.dir, hitPolygon, hitPosition);
 
-        nextRays[*cursor] = {
+        #ifdef __CUDA_ARCH__
+            int index = atomicAdd(cursor, 1);
+        #endif
+
+        #ifndef __CUDA_ARCH__
+        *cursor = *cursor + 1;
+        int index = *cursor;
+        #endif
+
+        nextRays[index - 1] = {
             .pos = nextRay.pos,
             .dir = nextRay.dir,
             .color = Vector::Mult(hitPolygon.reflection, hitColor),
             .pixelPos = ray.pixelPos,
             .depth = ray.depth + 1
         };
-        *cursor = *cursor + 1;
     }
 
     if (hitPolygon.transparent > 0.0) {
         Vector::TVector3 refractedDir = ray.dir;
         Vector::TVector3 refractedPos = Vector::Add(hitPosition, Vector::Mult(EPS, refractedDir));
 
-        nextRays[*cursor] = {
+        #ifdef __CUDA_ARCH__
+            int index = atomicAdd(cursor, 1);
+        #endif
+
+        #ifndef __CUDA_ARCH__
+        *cursor = *cursor + 1;
+        int index = *cursor;
+        #endif
+
+        nextRays[index - 1] = {
             .pos = refractedPos,
             .dir = refractedDir,
             .color = Vector::Mult(hitPolygon.transparent, hitColor),
             .pixelPos = ray.pixelPos,
             .depth = ray.depth + 1
         };
-        *cursor = *cursor + 1;
     }
 
     return resultColor;

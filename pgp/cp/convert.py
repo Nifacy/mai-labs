@@ -1,61 +1,120 @@
-import argparse
-import pathlib
-import numpy as np
+#!/usr/bin/python
+# -*- coding: utf-8
 
+import sys
+import struct
 from PIL import Image
+import ctypes
+
+pal = [
+	(0, 0, 0),			(128, 128, 128),	(192, 192, 192),	(255, 255, 255),
+	(255, 0, 255),		(128, 0, 128),		(255, 0, 0),		(128, 0, 0),
+	(205, 92, 92),		(240, 128, 128),	(250, 128, 114),	(233, 150, 122),
+	(205, 92, 92),		(240, 128, 128),	(250, 128, 114),	(233, 150, 122),
+	(173, 255, 47),		(127, 255, 0),		(124, 252, 0),		(0, 255, 0),
+	(50, 205, 50),		(152, 251, 152),	(144, 238, 144),	(0, 250, 154),
+	(0, 255, 127),		(60, 179, 113),		(46, 139, 87),		(34, 139, 34),
+	(0, 128, 0),		(0, 100, 0),		(154, 205, 50),		(107, 142, 35),
+	(128, 128, 0),		(85, 107, 47),		(102, 205, 170),	(143, 188, 143),
+	(32, 178, 170),		(0, 139, 139),		(0, 128, 128)
+]
+
+def to_img_alfa(src, dst = None):
+	fin = open(src, 'rb')
+	(w, h) = struct.unpack('hi', fin.read(8))
+	buff = ctypes.create_string_buffer(4 * w * h)
+	fin.readinto(buff)
+	fin.close()
+	img = Image.new('RGB', (w, h))
+	pix = img.load()
+	offset = 0
+	sp = len(pal)
+	for j in xrange(h):
+		for i in xrange(w):
+			(_, _, _, a) = struct.unpack_from('cccc', buff, offset)
+			pix[i, j] = pal[ord(a) % sp]
+			offset += 4
+	if dst:
+		img.save(dst)
+	else:
+		img.show()
 
 
-def read_data_file(input_path: pathlib.Path) -> Image.Image:
-    with input_path.open("rb") as file:
-        width = int.from_bytes(file.read(4), byteorder="little")
-        height = int.from_bytes(file.read(4), byteorder="little")
-
-        raw_data = file.read()
-        img_data = np.frombuffer(raw_data, dtype=np.uint8)
-        img_data = img_data.reshape((height, width, 4))
-
-    return Image.fromarray(img_data[:, :, :3], "RGB")
-
-
-def save_in_data_format(image: Image.Image, output_path: pathlib.Path) -> None:
-    img_data = np.array(image)
-
-    if img_data.ndim != 3 or img_data.shape[2] != 3:
-        raise ValueError("Image must be in RGB format.")
-
-    height, width, _ = img_data.shape
-    rgba_data = np.dstack((img_data, np.full((height, width), 255, dtype=np.uint8)))
-
-    with output_path.open("wb") as file:
-        file.write(width.to_bytes(4, byteorder="little"))
-        file.write(height.to_bytes(4, byteorder="little"))
-        file.write(rgba_data.tobytes())
+def to_img(src, dst = None):
+	fin = open(src, 'rb')
+	(w, h) = struct.unpack('hi', fin.read(8))
+	buff = ctypes.create_string_buffer(4 * w * h)
+	fin.readinto(buff)
+	fin.close()
+	img = Image.new('RGBA', (w, h))
+	pix = img.load()
+	offset = 0
+	for j in xrange(h):
+		for i in xrange(w):
+			(r, g, b, a) = struct.unpack_from('cccc', buff, offset)
+			pix[i, j] = (ord(r), ord(g), ord(b), ord(a))
+			offset += 4
+	if dst:
+		img.save(dst)
+	else:
+		img.show()
 
 
-def save_as_jpg(image: Image.Image, output_path: pathlib.Path) -> None:
-    image.save(str(output_path.absolute()), "JPEG")
+def from_img(src, dst):
+	img = Image.open(src)
+	(w, h) = img.size[0:2]
+	pix = img.load()
+	buff = ctypes.create_string_buffer(4 * w * h)
+	offset = 0
+	for j in xrange(h):
+		for i in xrange(w):
+			r = chr(pix[i, j][0])
+			g = chr(pix[i, j][1])
+			b = chr(pix[i, j][2])
+			struct.pack_into('cccc', buff, offset, r, g, b, '\0')
+			offset += 4;
+	out = open(dst, 'wb')
+	out.write(struct.pack('ii', w, h))
+	out.write(buff.raw)
+	out.close()
 
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Convert a .data image file to JPG format.",
-    )
-
-    parser.add_argument("input_files_mask", help="Path or mask to the input .data file.")
-
-    return parser.parse_args()
-
-
-# if __name__ == "__main__":
-#     args = parse_args()
-#     input_files_mask = args.input_files_mask
-
-#     for input_file in pathlib.Path(".").rglob(input_files_mask):
-#         output_file = pathlib.Path(f"{input_file}.jpg")
-
-#         print(f"[log] process {input_file} ...")
-#         save_as_jpg(read_data_file(input_file), output_file)
-#         print(f"[log] image {output_file} created")
-
-# read_data_file(pathlib.Path("textures/simple.data")).show()
-save_in_data_format(Image.open("textures/floor.jpg"), pathlib.Path("textures/floor.data"))
+def main():
+	argv = []
+	alfa = show = False
+	for arg in sys.argv[1:]:
+		if arg == '-a':
+			alfa = True
+		elif arg == '-s':
+			show = True
+		else:
+			argv.append(arg)
+	if show:
+		if len(argv) == 1 and argv[0].endswith('.data'):
+			if alfa:
+				to_img_alfa(argv[0])
+			else:
+				to_img(argv[0])
+		else:
+			print 'Error argv'
+	else:
+		if len(argv) != 2:
+			print 'Error count argv'
+			sys.exit(1)
+		f1 = argv[0].endswith('.data')
+		f2 = argv[1].endswith('.data')
+		if not (f1 or f2):
+			print 'Error type argv or count'
+			sys.exit(1)
+		if f1:
+			if alfa:
+				to_img_alfa(argv[0], argv[1])
+			else:
+				to_img(argv[0], argv[1])
+		else:
+			if not alfa:
+				from_img(argv[0], argv[1])
+			else:
+				print 'Error alfa'
+	
+if __name__ == '__main__':
+	main()

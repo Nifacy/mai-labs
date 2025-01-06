@@ -25,10 +25,10 @@ void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCan
     Vector::TVector3 by = Vector::Normalize(Vector::Prod(bx, bz));
 
     size_t initialRayCount = canvas->width * canvas->height;
-    TRay *rays1 = (TRay *) malloc(initialRayCount * sizeof(TRay));
-    TRay *rays2 = (TRay *) malloc(2 * initialRayCount * sizeof(TRay)); // Предполагаем, что потребуется в 2 раза больше
-    size_t rays1Count = 0;
-    size_t rays2Count = 0;
+    TRay *rays1 = (TRay *) malloc(8 * initialRayCount * sizeof(TRay));
+    TRay *rays2 = (TRay *) malloc(8 * initialRayCount * sizeof(TRay)); // Предполагаем, что потребуется в 2 раза больше
+    int rays1Count = 0;
+    int rays2Count = 0;
 
     // initialize rays
     for(unsigned int i = 0; i < canvas->width; i++) {
@@ -49,21 +49,24 @@ void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCan
 		}
 	}
 
+    int it = 0;
+
     for (int i = 0;; i = (i + 1) % 2) {
         TRay *current = (i % 2 == 0) ? rays1 : rays2;
-        size_t &currentCount = (i % 2 == 0) ? rays1Count : rays2Count;
+        int &currentCount = (i % 2 == 0) ? rays1Count : rays2Count;
         TRay *next = (i % 2 == 0) ? rays2 : rays1;
-        size_t &nextCount = (i % 2 == 0) ? rays2Count : rays1Count;
+        int &nextCount = (i % 2 == 0) ? rays2Count : rays1Count;
 
         if (currentCount == 0) {
             break;
         }
 
         nextCount = 0;
+        std::cout << "iteration: " << it << ", rays: " << currentCount << std::endl;
 
-        for (size_t j = 0; j < currentCount; ++j) {
+        for (int j = 0; j < currentCount; ++j) {
             TRay el = current[j];
-            Canvas::TColor color = VectorToColor(Ray(el, polygons.data(), polygons.size(), lights.data(), lights.size(), next, &nextCount));
+            Canvas::TColor color = VectorToColor(Ray(el, polygons.data(), polygons.size(), lights.data(), lights.size(), next, &nextCount, false));
             Canvas::TColor canvasColor = Canvas::GetPixel(canvas, { .x = el.pixelPos.x, .y = el.pixelPos.y });
             Canvas::TColor resultColor = {
                 .r = (unsigned char) std::min(255, int(color.r) + int(canvasColor.r)),
@@ -76,6 +79,7 @@ void render(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCan
         }
 
         currentCount = 0;
+        it++;
     }
 
     free(rays1);
