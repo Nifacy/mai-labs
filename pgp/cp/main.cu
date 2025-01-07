@@ -1,260 +1,251 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <cassert>
 
-#include "texture.cuh"
-#include "texture_projection.cuh"
-#include "utils.cuh"
-#include "canvas.cuh"
-#include "polygon.cuh"
-#include "debug_render.cuh"
-#include "cpu_render.cuh"
-#include "render.cuh"
+#include "vector.cuh"
 #include "scene.cuh"
+#include "canvas.cuh"
+#include "timer.cuh"
 
+#include "cpu_render.cuh"
+#include "gpu_render.cuh"
 
-__device__ Canvas::TColor VectorToColor2(Vector::TVector3 v) {
-    return {
-        (unsigned char) Max(0, Min(int(v.x * 255.0), 255)),
-        (unsigned char) Max(0, Min(int(v.y * 255.0), 255)),
-        (unsigned char) Max(0, Min(int(v.z * 255.0), 255)),
-        255
-    };
-}
+typedef enum {
+    ON_CPU,
+    ON_GPU
+} TRenderMode;
 
-__device__ Vector::TVector3 ColorToVector2(Canvas::TColor color) {
-    return Vector::Mult(
-        1.0 / 255.0,
-        { (double) color.r, (double) color.g, (double) color.b}
-    );
-}
+typedef enum {
+    RENDER,
+    PRINT_DEFAULT_CONFIG
+} TAction;
 
-__global__ void GpuSsaa(Canvas::TCanvas src, Canvas::TCanvas dst, unsigned int coef) {
-    int startX = blockDim.x * blockIdx.x + threadIdx.x;
-    int startY = blockDim.y * blockIdx.y + threadIdx.y;
-    int offsetX = blockDim.x * gridDim.x;
-    int offsetY = blockDim.y * gridDim.y;
+struct TCameraMotionConfig {
+    double r_0_c;
+    double z_0_c;
+    double phi_0_c;
+    double a_r_c;
+    double a_z_c;
+    double omega_r_c;
+    double omega_z_c;
+    double omega_phi_c;
+    double p_r_c;
+    double p_z_c;
+    double r_0_n;
+    double z_0_n;
+    double phi_0_n;
+    double a_r_n;
+    double a_z_n;
+    double omega_r_n;
+    double omega_z_n;
+    double omega_phi_n;
+    double p_r_n;
+    double p_z_n;
+};
 
-    for (unsigned int x = startX; x < dst.width; x += offsetX) {
-        for (unsigned int y = startY; y < dst.height; y += offsetY) {
-            Vector::TVector3 color = { 0.0, 0.0, 0.0 };
+struct TLightConfig {
+    Vector::TVector3 pos;
+    Vector::TVector3 color;
+};
 
-            for (unsigned int dx = 0; dx < coef; ++dx) {
-                for (unsigned int dy = 0; dy < coef; ++dy) {
-                    Canvas::TColor srcColor = Canvas::GetPixel(&src, { x * coef + dx, y * coef + dy });
-                    color = Vector::Add(color, ColorToVector2(srcColor));
-                }
-            }
+struct TConfig {
+    unsigned int frames;
+    std::string outputFileTemplate;
+    unsigned int canvasWidth;
+    unsigned int canvasHeight;
+    double angle;
+    TCameraMotionConfig motionConfig;
+    std::vector<TObjectConfig> objectsConfig;
+    TFloorConfig floorConfig;
+    std::vector<TLightConfig> lightsConfig;
+    int recursionDepth;
+    int ssaaCoef;
+};
 
-            color = Vector::Mult(1.0 / coef / coef, color);
-            Canvas::PutPixel(&dst, { x, y }, VectorToColor2(color));
-        }
+TRenderMode GetRenderMode(const std::vector<std::string> &args) {
+    for (const std::string &arg : args) {
+        if (arg == "--cpu") return TRenderMode::ON_CPU;
+        if (arg == "--gpu") return TRenderMode::ON_GPU;
     }
+    return TRenderMode::ON_GPU;
 }
 
-__global__ void kernel(
-    TRay *current, int currentCount,
-    TRay *next, int *cursor,
-    Polygon::TPolygon *polygons, size_t polygonsAmount,
-    TLight *lights, size_t lightsAmount,
-    Canvas::TCanvas canvas,
-    int *lock
-) {
-    size_t offset = gridDim.x * blockDim.x;
-    size_t start = blockDim.x * blockIdx.x + threadIdx.x;
-
-    for (int j = start; j < currentCount; j += offset) {
-        TRay el = current[j];
-        Canvas::TColor color = VectorToColor2(Ray(el, polygons, polygonsAmount, lights, lightsAmount, next, cursor, true));
-
-        atomicAdd(lock, 1);
-        Canvas::AddPixel(&canvas, { .x = el.pixelPos.x, .y = el.pixelPos.y }, color);
-        atomicSub(lock, 1);
+TAction GetAction(const std::vector<std::string> &args) {
+    for (const std::string &arg : args) {
+        if (arg == "--default") return TAction::PRINT_DEFAULT_CONFIG;
     }
+    return TAction::RENDER;
 }
 
-__global__ void initRays(Canvas::TCanvas canvas, Vector::TVector3 pc, Vector::TVector3 pv, double angle, TRay *rays) {
-    double dw = 2.0 / (canvas.width - 1.0);
-    double dh = 2.0 / (canvas.height - 1.0);
-    double z = 1.0 / tan(angle * M_PI / 360.0);
+TConfig ReadRenderConfig() {
+    TConfig config;
 
-    Vector::TVector3 bz = Vector::Normalize(Vector::Sub(pv, pc));
-    Vector::TVector3 bx = Vector::Normalize(Vector::Prod(bz, {0.0, 0.0, 1.0}));
-    Vector::TVector3 by = Vector::Normalize(Vector::Prod(bx, bz));
+    std::cin >> config.frames;
+    std::cin >> config.outputFileTemplate;
+    std::cin >> config.canvasWidth >> config.canvasHeight >> config.angle;
 
-    int startX = blockDim.x * blockIdx.x + threadIdx.x;
-    int startY = blockDim.y * blockIdx.y + threadIdx.y;
-    int offsetX = blockDim.x * gridDim.x;
-    int offsetY = blockDim.y * gridDim.y;
+    std::cin >> config.motionConfig.r_0_c;
+    std::cin >> config.motionConfig.z_0_c;
+    std::cin >> config.motionConfig.phi_0_c;
+    std::cin >> config.motionConfig.a_r_c;
+    std::cin >> config.motionConfig.a_z_c;
+    std::cin >> config.motionConfig.omega_r_c;
+    std::cin >> config.motionConfig.omega_z_c;
+    std::cin >> config.motionConfig.omega_phi_c;
+    std::cin >> config.motionConfig.p_r_c;
+    std::cin >> config.motionConfig.p_z_c;
+    std::cin >> config.motionConfig.r_0_n;
+    std::cin >> config.motionConfig.z_0_n;
+    std::cin >> config.motionConfig.phi_0_n;
+    std::cin >> config.motionConfig.a_r_n;
+    std::cin >> config.motionConfig.a_z_n;
+    std::cin >> config.motionConfig.omega_r_n;
+    std::cin >> config.motionConfig.omega_z_n;
+    std::cin >> config.motionConfig.omega_phi_n;
+    std::cin >> config.motionConfig.p_r_n;
+    std::cin >> config.motionConfig.p_z_n;
 
-    for(unsigned int i = startX; i < canvas.width; i += offsetX) {
-        for(unsigned int j = startY; j < canvas.height; j += offsetY) {
-            Vector::TVector3 v = {-1.0 + dw * i, (-1.0 + dh * j) * canvas.height / canvas.width, z};
-            Vector::TVector3 dir = Vector::Mult(bx, by, bz, v);
-            rays[j * canvas.width + i] = {
-                .pos = pc,
-                .dir = Vector::Normalize(dir),
-                .color = { 1.0, 1.0, 1.0 },
-                .pixelPos = { .x = i, .y = canvas.height - 1 - j },
-                .depth = 0
-            };
+    for (int i = 0; i < 3; ++i) {
+        TObjectConfig objectConfig;
+        std::cin >> objectConfig.pos.x >> objectConfig.pos.y >> objectConfig.pos.z;
+        std::cin >> objectConfig.color.x >> objectConfig.color.y >> objectConfig.color.z;
+        std::cin >> objectConfig.r;
+        std::cin >> objectConfig.reflection;
+        std::cin >> objectConfig.transparent;
+        std::cin >> objectConfig.lightsAmount;
 
-            Canvas::PutPixel(&canvas, { .x = i, .y = canvas.height - 1 - j }, { 0, 0, 0, 255 });
-		}
-	}
-}
-
-void GpuRender2(Vector::TVector3 pc, Vector::TVector3 pv, double angle, Canvas::TCanvas *canvas, std::vector<Polygon::TPolygon> &polygons, std::vector<TLight> &lights) {
-    size_t initialRayCount = canvas->width * canvas->height;
-
-    TRay *rays1;
-    SAVE_CUDA(cudaMalloc((void**) &rays1, 8 * initialRayCount * sizeof(TRay)));
-    initRays<<<100, 100>>>(*canvas, pc, pv, angle, rays1);
-    cudaDeviceSynchronize();
-    SAVE_CUDA(cudaGetLastError());
-
-    int *rays1Count;
-    SAVE_CUDA(cudaMalloc((void **) &rays1Count, sizeof(int)));
-    SAVE_CUDA(cudaMemcpy(rays1Count, &initialRayCount, sizeof(int), cudaMemcpyHostToDevice));
-
-    int *lock;
-    SAVE_CUDA(cudaMalloc((void **) &lock, sizeof(int)));
-
-    TRay *rays2;
-    SAVE_CUDA(cudaMalloc((void**) &rays2, 8 * initialRayCount * sizeof(TRay)));
-
-    int *rays2Count;
-    SAVE_CUDA(cudaMalloc((void **) &rays2Count, sizeof(int)));
-    SAVE_CUDA(cudaMemset(rays2Count, 0, sizeof(int)));
-
-    Polygon::TPolygon *devicePolygons;
-    SAVE_CUDA(cudaMalloc((void**) &devicePolygons, polygons.size() * sizeof(Polygon::TPolygon)));
-    SAVE_CUDA(cudaMemcpy(devicePolygons, polygons.data(), polygons.size() * sizeof(Polygon::TPolygon), cudaMemcpyHostToDevice));
-
-    TLight *deviceLights;
-    SAVE_CUDA(cudaMalloc((void**)& deviceLights, lights.size() * sizeof(TLight)));
-    SAVE_CUDA(cudaMemcpy(deviceLights, lights.data(), lights.size() * sizeof(TLight), cudaMemcpyHostToDevice));
-
-    int it = 0;
-
-    for (int i = 0;; i = (i + 1) % 2) {
-        TRay *current = (i % 2 == 0) ? rays1 : rays2;
-        int *currentCount = (i % 2 == 0) ? rays1Count : rays2Count;
-        TRay *next = (i % 2 == 0) ? rays2 : rays1;
-        int *nextCount = (i % 2 == 0) ? rays2Count : rays1Count;
-
-        int tmp;
-        cudaMemcpy(&tmp, currentCount, sizeof(int), cudaMemcpyDeviceToHost);
-        SAVE_CUDA(cudaMemset(nextCount, 0, sizeof(int)));
-
-        std::cout << "iteration: " << it << ", rays: " << tmp << std::endl;
-        
-        if (tmp == 0) {
-            break;
-        }
-
-        kernel<<<200, 200>>>(
-            current, tmp,
-            next, nextCount,
-            devicePolygons, polygons.size(),
-            deviceLights, lights.size(),
-            *canvas,
-            lock
-        );
-        cudaDeviceSynchronize();
-        SAVE_CUDA(cudaGetLastError());
-        std::cout << "iteration: " << it << ", rays: " << tmp << " [ok]" << std::endl;
-
-        it++;
+        config.objectsConfig.push_back(objectConfig);
     }
 
-    cudaFree(devicePolygons);
-    cudaFree(deviceLights);
-    cudaFree(rays1);
-    cudaFree(rays1Count);
-    cudaFree(rays2);
-    cudaFree(rays2Count);
-    cudaFree(lock);
-}
-
-
-__global__ void GpuDraw(Canvas::TCanvas canvas) {
-    int idx = blockDim.x * blockIdx.x + threadIdx.x;
-    int idy = blockDim.y * blockIdx.y + threadIdx.y;
-    int offsetx = blockDim.x * gridDim.x;
-    int offsety = blockDim.y * gridDim.y;
-
-    for (unsigned int x = idx; x < canvas.width; x += offsetx) {
-        for (unsigned int y = idy; y < canvas.height; y += offsety) {
-            Canvas::PutPixel(&canvas, Canvas::TPosition { x, y }, Canvas::TColor { 255, 0, 0, 255 });
-        }
+    for (int i = 0; i < 4; ++i) {
+        std::cin >> config.floorConfig.vertices[i].x;
+        std::cin >> config.floorConfig.vertices[i].y;
+        std::cin >> config.floorConfig.vertices[i].z;
     }
-}
 
-/* Cpu render */
+    std::cin >> config.floorConfig.texturePath;
+    std::cin >> config.floorConfig.color.x;
+    std::cin >> config.floorConfig.color.y;
+    std::cin >> config.floorConfig.color.z;
+    std::cin >> config.floorConfig.reflection;
 
-void CpuDraw(Canvas::TCanvas canvas) {
-    for (unsigned int x = 0; x < canvas.width; ++x) {
-        for (unsigned int y = 0; y < canvas.height; ++y) {
-            Canvas::PutPixel(&canvas, Canvas::TPosition { x, y }, Canvas::TColor { 255, 0, 0, 255 });
-        }
+    int lightsAmount;
+    std::cin >> lightsAmount;
+
+    for (int i = 0; i < lightsAmount; ++i) {
+        TLightConfig lightConfig;
+        std::cin >> lightConfig.pos.x >> lightConfig.pos.y >> lightConfig.pos.z;
+        std::cin >> lightConfig.color.x >> lightConfig.color.y >> lightConfig.color.z;
+        config.lightsConfig.push_back(lightConfig);
     }
+
+    std::cin >> config.recursionDepth;
+    std::cin >> config.ssaaCoef;
+
+    return config;
 }
-
-
-const unsigned int CANVAS_WIDTH = 400;
-const unsigned int CANVAS_HEIGHT = 400;
-
 
 int main(int argc, char *argv[]) {
-    std::string deviceTypeArg = std::string(argv[1]);    
-    Canvas::TCanvas canvas, extendedCanvas;
+    assert(argc <= 2);
 
-    DeviceType deviceType = (deviceTypeArg == "gpu") ? DeviceType::GPU : DeviceType::CPU;
+    std::vector<std::string> args;
+    char buff[256];
 
-    Canvas::Init(&canvas, CANVAS_WIDTH, CANVAS_HEIGHT, deviceType);
-    Canvas::Init(&extendedCanvas, 2 * CANVAS_WIDTH, 2 * CANVAS_HEIGHT, deviceType);
-
-    std::vector<Polygon::TPolygon> polygons;
-    std::vector<TLight> lights = {
-        { .position = { 5.0, 5.0, 5.0 }, .color = { 1.0, 1.0, 1.0 } }
-    };
-
-    build_space(polygons, deviceType);
-
-    Vector::TVector3 pc = { 0.0, 6.0, 4.0 };
-    Vector::TVector3 pv = { 0.0, -3.0, -1.2 };
-
-    if (deviceTypeArg == "gpu") {
-        std::cerr << "[log] using GPU render ..." << std::endl;
-
-        GpuRender2(
-            pc, pv, 120.0,
-            &extendedCanvas,
-            polygons, lights
-        );
-
-        GpuSsaa<<<200, 200>>>(extendedCanvas, canvas, 2);
-        cudaDeviceSynchronize();
-        SAVE_CUDA(cudaGetLastError());
-
-    } else if (deviceTypeArg == "cpu") {
-        std::cerr << "[log] using CPU render ..." << std::endl;
-
-        render(
-            pc, pv, 120.0,
-            &extendedCanvas,
-            polygons, lights
-        );
-
-        CpuSsaa(&extendedCanvas, &canvas, 2);
-
-    } else {
-        std::cerr << "[log] using debug render ..." << std::endl;
-        DebugRenderer::Render(canvas, polygons.data(), polygons.size());
+    for (int i = 0; i < argc; ++i) {
+        args.push_back(std::string(argv[i]));
     }
 
-    Canvas::Dump(&canvas, "build/0.data");
+    TRenderMode renderMode = GetRenderMode(args);
+    TAction action = GetAction(args);
+
+    if (action == TAction::PRINT_DEFAULT_CONFIG) {
+        std::ifstream inputFile("example.in");
+        std::string line;
+
+        if (!inputFile.is_open()) {
+            return 1;
+        }
+
+        while (std::getline(inputFile, line)) {
+            std::cout << line << std::endl;
+        }
+
+        inputFile.close();
+        return 0;
+    }
+
+    TConfig config = ReadRenderConfig();
+    DeviceType deviceType = (renderMode == TRenderMode::ON_CPU) ? DeviceType::CPU : DeviceType::GPU;    
+    Canvas::TCanvas canvas, extendedCanvas;
+
+    Canvas::Init(&canvas, config.canvasWidth, config.canvasHeight, deviceType);
+    Canvas::Init(&extendedCanvas, config.ssaaCoef * config.canvasWidth, config.ssaaCoef * config.canvasHeight, deviceType);
+
+    std::vector<Polygon::TPolygon> polygons;
+    build_space(polygons, deviceType, config.floorConfig, config.objectsConfig);
+
+    std::vector<Renderer::TLight> lights;
+    for (const TLightConfig lightConfig : config.lightsConfig) {
+        lights.push_back(Renderer::TLight {
+            .position = lightConfig.pos,
+            .color = lightConfig.color
+        });
+    }
+
+    double tau = 2.0 * M_PI / config.frames;
+
+    for (int k = 0; k < (int) config.frames; ++k) {
+        double t = k * tau;
+        Timer::TTimer timer;
+        size_t raysCount = 0;
+
+        Vector::TVector3 pc = Vector::FromCylindric({
+            config.motionConfig.r_0_c + config.motionConfig.a_r_c * sin(config.motionConfig.omega_r_c * t + config.motionConfig.p_r_c),
+            config.motionConfig.z_0_c + config.motionConfig.a_z_c * sin(config.motionConfig.omega_z_c * t + config.motionConfig.p_z_c),
+            config.motionConfig.phi_0_c + config.motionConfig.omega_phi_c * t
+        });
+
+        Vector::TVector3 pv = Vector::FromCylindric({
+            config.motionConfig.r_0_n + config.motionConfig.a_r_n * sin(config.motionConfig.omega_r_n * t + config.motionConfig.p_r_n),
+            config.motionConfig.z_0_n + config.motionConfig.a_z_n * sin(config.motionConfig.omega_z_n * t + config.motionConfig.p_z_n),
+            config.motionConfig.phi_0_n + config.motionConfig.omega_phi_n * t
+        });
+
+        if (deviceType == DeviceType::GPU) {
+            Timer::Start(&timer);
+            GpuRenderer::Render(
+                pc, pv, config.angle,
+                &extendedCanvas,
+                polygons, lights,
+                &raysCount,
+                config.recursionDepth
+            );
+
+            GpuRenderer::Ssaa<<<GpuRenderer::DEVICE_BLOCKS, GpuRenderer::DEVICE_THREADS>>>(extendedCanvas, canvas, config.ssaaCoef);
+            cudaDeviceSynchronize();
+            SAVE_CUDA(cudaGetLastError());
+            Timer::Stop(&timer);
+        } else {
+            Timer::Start(&timer);
+            CpuRenderer::Render(
+                pc, pv, config.angle,
+                &extendedCanvas,
+                polygons, lights,
+                &raysCount,
+                config.recursionDepth
+            );
+
+            CpuRenderer::Ssaa(&extendedCanvas, &canvas, config.ssaaCoef);
+            Timer::Stop(&timer);
+        }
+
+        printf("%d\t%lu\t%lld\n", k, raysCount, Timer::GetTime(&timer));
+
+        sprintf(buff, config.outputFileTemplate.c_str(), k);
+        Canvas::Dump(&canvas, buff);
+    }
+
     Canvas::Destroy(&canvas);
     Canvas::Destroy(&extendedCanvas);
 

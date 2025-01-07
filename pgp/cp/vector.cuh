@@ -60,6 +60,11 @@ namespace Vector {
         return { coef * v.x, coef * v.y, coef * v.z };
     }
 
+    Vector::TVector3 FromCylindric(Vector::TVector3 v) {
+        // x = r, y = z, z = phi
+        return {v.x * std::cos(v.z), v.x * std::sin(v.z), v.y};
+    }
+
 }    
 
 #endif // _VECTOR_H_

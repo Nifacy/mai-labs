@@ -81,7 +81,7 @@ std::vector<TFace> LoadMesh(const std::string &filepath) {
             int v1, v2, v3;
             iss >> v1 >> v2 >> v3;
 
-            if (v1 <= 0 || v2 <= 0 || v3 <= 0 ||  v1 > vertices.size() || v2 > vertices.size() || v3 > vertices.size()) {
+            if (v1 <= 0 || v2 <= 0 || v3 <= 0 ||  v1 > (int) vertices.size() || v2 > (int) vertices.size() || v3 > (int) vertices.size()) {
                 throw std::runtime_error("Invalid face indices in file: " + filepath);
             }
 
@@ -90,8 +90,6 @@ std::vector<TFace> LoadMesh(const std::string &filepath) {
             continue;
         }
     }
-
-    std::cerr << "[log] read " << vertices.size() << " vertices\n";
 
     file.close();
     return faces;
@@ -108,6 +106,21 @@ struct TModelConfig {
     bool isLightSource;
 };
 
+struct TObjectConfig {
+    Vector::TVector3 pos;
+    Vector::TVector3 color;
+    double r;
+    double reflection;
+    double transparent;
+    int lightsAmount;
+};
+
+struct TFloorConfig {
+    Vector::TVector3 vertices[4];
+    std::string texturePath;
+    Vector::TVector3 color;
+    double reflection;
+};
 
 void BuildModel(const TModelConfig &config, const std::vector<TFace> &mesh, std::vector<Polygon::TPolygon> &out) {
     for (const TFace &face : mesh) {
@@ -141,8 +154,8 @@ struct TLampLineConfig {
 
 
 void BuildLampLine(const TModelConfig &modelConfig, const std::vector<TFace> &mesh, int n, TLampLineConfig config, std::vector<Polygon::TPolygon> &out) {
-    for (int t1 = 0; t1 < mesh.size(); ++t1) {
-        for (int t2 = t1 + 1; t2 < mesh.size(); ++t2) {
+    for (int t1 = 0; t1 < (int) mesh.size(); ++t1) {
+        for (int t2 = t1 + 1; t2 < (int) mesh.size(); ++t2) {
             Polygon::TPolygon a = { .verticles = { mesh[t1].vertices[0], mesh[t1].vertices[1], mesh[t1].vertices[2] } };
             Polygon::TPolygon b = { .verticles = { mesh[t2].vertices[0], mesh[t2].vertices[1], mesh[t2].vertices[2] } };
 
@@ -231,14 +244,14 @@ void BuildLampLine(const TModelConfig &modelConfig, const std::vector<TFace> &me
 }
 
 
-void BuildFloor(std::vector<Polygon::TPolygon> &out, DeviceType deviceType) {
+void BuildFloor(std::vector<Polygon::TPolygon> &out, DeviceType deviceType, TFloorConfig config) {
     Texture::TTexture floorTexture;
-    Texture::Load(&floorTexture, "textures/floor.data", deviceType);
+    Texture::Load(&floorTexture, config.texturePath.c_str(), deviceType);
 
     out.push_back(Polygon::TPolygon {
-        .verticles = { { -5.0, -5.0, 1.0 }, { 5.0, -5.0, 0.0 }, { -5.0, 5.0, 0.0 } },
-        .color = { 1.0, 1.0, 1.0 },
-        .reflection = 0.0,
+        .verticles = { config.vertices[0], config.vertices[1], config.vertices[2] },
+        .color = config.color,
+        .reflection = config.reflection,
         .transparent = 0.0,
         .blend = 0.0,
         .isLightSource = false,
@@ -246,15 +259,15 @@ void BuildFloor(std::vector<Polygon::TPolygon> &out, DeviceType deviceType) {
             .enabled = true,
             .texture = TextureProjection::TTextureProjection {
                 .src = floorTexture,
-                .verticles = { { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 } }
+                .verticles = { { 0.0, 1.0, 0.0 }, { 1.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 }  }
             }
         }
     });
 
     out.push_back(Polygon::TPolygon {
-        .verticles = { { -5.0, 5.0, 0.0 }, { 5.0, -5.0, 0.0 }, { 5.0, 5.0, 1.0 } },
-        .color = { 1.0, 1.0, 1.0 },
-        .reflection = 0.0,
+        .verticles = { config.vertices[2], config.vertices[1], config.vertices[3] },
+        .color = config.color,
+        .reflection = config.reflection,
         .transparent = 0.0,
         .blend = 0.0,
         .isLightSource = false,
@@ -262,68 +275,91 @@ void BuildFloor(std::vector<Polygon::TPolygon> &out, DeviceType deviceType) {
             .enabled = true,
             .texture = TextureProjection::TTextureProjection {
                 .src = floorTexture,
-                .verticles = { { 1.0, 1.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 } }
+                .verticles = { { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, { 1.0, 0.0, 0.0 }}
             }
         }
     });
 }
 
 
-void BuildTetrahedron(std::vector<Polygon::TPolygon> &out) {
+void BuildTetrahedron(std::vector<Polygon::TPolygon> &out, TObjectConfig config) {
+    // Vector::TVector3 pos; { -3.0, -3.0, 1.0 }
+    // Vector::TVector3 color; { 0.6, 0.0, 0.0 }
+    // double r; 3.0
+    // double reflection; 1.0
+    // double transparent; 1.0
+    // int lightsAmount; 5
+
+
     std::vector<TFace> mesh = LoadMesh("objects/tetrahedron.obj");
-    TModelConfig config = {
-        .pos = { -3.0, -3.0, 1.0 },
-        .color = { 0.6, 0.0, 0.0 },
-        .scale = 4.0,
-        .reflection = 1.0,
-        .transparent = 1.0,
+    TModelConfig modelConfig = {
+        .pos = config.pos,
+        .color = config.color,
+        .scale = config.r,
+        .reflection = config.reflection,
+        .transparent = config.transparent,
         .blend = 1.0,
         .isLightSource = false
     };
 
-    BuildLampLine(config, mesh, 8, { .frameOffset = 1.0, .heightScale = 0.5, .widthScale = 0.8 }, out);
-    BuildModel(config, mesh, out);
+    BuildLampLine(modelConfig, mesh, config.lightsAmount, { .frameOffset = 1.0, .heightScale = 0.5, .widthScale = 0.8 }, out);
+    BuildModel(modelConfig, mesh, out);
 }
 
-void BuildDodecahedron(std::vector<Polygon::TPolygon> &out) {
+void BuildDodecahedron(std::vector<Polygon::TPolygon> &out, TObjectConfig config) {
+    // Vector::TVector3 pos;  { 3.0, 3.0, 2.5 }
+    // Vector::TVector3 color; { 0.0, 0.6, 0.0 }
+    // double r; 1.0
+    // double reflection; 1.0
+    // double transparent; 0.6
+    // int lightsAmount; 5
+
+
     std::vector<TFace> mesh = LoadMesh("objects/dodecahedron.obj");
-    TModelConfig config = {
-        .pos = { 3.0, 3.0, 2.5 },
-        .color = { 0.0, 0.6, 0.0 },
-        .scale = 0.2,
-        .reflection = 1.0,
-        .transparent = 0.6,
+    TModelConfig modelConfig = {
+        .pos = config.pos,
+        .color = config.color,
+        .scale = 0.2 * config.r,
+        .reflection = config.reflection,
+        .transparent = config.transparent,
         .blend = 1.0,
         .isLightSource = false
     };
 
-    BuildLampLine(config, mesh, 8, { .frameOffset = 2.5, .heightScale = 2.5, .widthScale = 1.0 }, out);
-    BuildModel(config, mesh, out);
+    BuildLampLine(modelConfig, mesh, config.lightsAmount, { .frameOffset = 2.5, .heightScale = 2.5, .widthScale = 1.0 }, out);
+    BuildModel(modelConfig, mesh, out);
 }
 
 
-void BuildIcosahedron(std::vector<Polygon::TPolygon> &out) {
+void BuildIcosahedron(std::vector<Polygon::TPolygon> &out, TObjectConfig config) {
+    // Vector::TVector3 pos;  { -3.0, 3.0, 2.5 }
+    // Vector::TVector3 color; { 0.0, 0.6, 0.6 }
+    // double r; 1.0
+    // double reflection; 1.0
+    // double transparent; 1.0
+    // int lightsAmount; 5
+
     std::vector<TFace> mesh = LoadMesh("objects/icosahedron.obj");
-    TModelConfig config = {
-        .pos = { -3.0, 3.0, 2.5 },
-        .color = { 0.0, 0.6, 0.6 },
-        .scale = 1.0,
-        .reflection = 1.0,
-        .transparent = 1.0,
+    TModelConfig modelConfig = {
+        .pos = config.pos,
+        .color = config.color,
+        .scale = config.r,
+        .reflection = config.reflection,
+        .transparent = config.transparent,
         .blend = 1.0,
         .isLightSource = false
     };
 
-    BuildLampLine(config, mesh, 8, { .frameOffset = 1.1, .heightScale = 0.3, .widthScale = 1.0 }, out);
-    BuildModel(config, mesh, out);
+    BuildLampLine(modelConfig, mesh, config.lightsAmount, { .frameOffset = 1.1, .heightScale = 0.3, .widthScale = 1.0 }, out);
+    BuildModel(modelConfig, mesh, out);
 }
 
 
-void build_space(std::vector<Polygon::TPolygon> &out, DeviceType deviceType) {
-    BuildFloor(out, deviceType);
-    BuildIcosahedron(out);
-    BuildTetrahedron(out);
-    BuildDodecahedron(out);
+void build_space(std::vector<Polygon::TPolygon> &out, DeviceType deviceType, TFloorConfig floorConfig, std::vector<TObjectConfig> objectConfigs) {
+    BuildFloor(out, deviceType, floorConfig);
+    BuildIcosahedron(out, objectConfigs[0]);
+    BuildTetrahedron(out, objectConfigs[1]);
+    BuildDodecahedron(out, objectConfigs[2]);
 }
 
 #endif
