@@ -1,0 +1,14 @@
+[project]
+name = "Utilities"
+version = "1"
+description = "Package of utility scripts for course project"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "numpy==2.2.2",
+    "pillow==11.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9.4",
+]
